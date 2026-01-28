@@ -7,17 +7,16 @@ const API_KEYS = (process.env.API_KEYS || "").split(",").filter(Boolean);
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// ====== CONFIG ======
-const ADMIN_ID = 8263902528;
+// ===== CONFIG =====
 const ADMIN_USERNAME = "ghoda_bawandr";
 const REQUIRED_CHANNEL = "@ghoda_spyyc";
-const REQUIRED_GROUP = "@ghoda_spyygc";
+const REQUIRED_GROUP  = "@ghoda_spyygc";
 
 const SEARCH_COST = 4;
 const DAILY_FREE_CREDITS = 3;
 const REFERRAL_BONUS = 10;
 
-// ====== API KEY ROTATION ======
+// ===== API KEY ROTATION =====
 let keyIndex = 0;
 function getApiKey() {
   const k = API_KEYS[keyIndex];
@@ -25,7 +24,7 @@ function getApiKey() {
   return k;
 }
 
-// ====== DB ======
+// ===== DB =====
 const DB_FILE = "users.json";
 let db = { users: {} };
 if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE));
@@ -33,15 +32,14 @@ function saveDB() {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-// ====== USERS ======
+// ===== USERS =====
 function initUser(id) {
   if (!db.users[id]) {
     db.users[id] = {
       credits: DAILY_FREE_CREDITS,
       lastDaily: new Date().toDateString(),
       referred: false,
-      referral_count: 0,
-      invited_by: null
+      referral_count: 0
     };
     saveDB();
   }
@@ -57,7 +55,7 @@ function getUser(id) {
   return db.users[id];
 }
 
-// ====== JOIN CHECK ======
+// ===== JOIN CHECK =====
 async function isJoined(chatId) {
   try {
     const c = await bot.getChatMember(REQUIRED_CHANNEL, chatId);
@@ -69,18 +67,18 @@ async function isJoined(chatId) {
   }
 }
 
-// ====== START ======
+// ===== /START =====
 bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
   const id = msg.chat.id;
   initUser(id);
 
+  // referral
   if (match && match[1]) {
-    const ref = String(match[1]);
+    const ref = match[1];
     if (ref !== String(id) && db.users[ref] && !db.users[id].referred) {
       db.users[ref].credits += REFERRAL_BONUS;
       db.users[ref].referral_count += 1;
       db.users[id].referred = true;
-      db.users[id].invited_by = ref;
       saveDB();
 
       bot.sendMessage(id, "🎁 Referral successful!");
@@ -90,7 +88,7 @@ bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
 
   bot.sendMessage(
     id,
-    `🐎 Ghoda Unhider
+`🐎 Ghoda Unhider
 
 Join channel & group first.
 Then press "I have joined".
@@ -100,8 +98,8 @@ Daily free credits: ${DAILY_FREE_CREDITS}`,
     {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📢 Join Channel", url: `https://t.me/${REQUIRED_CHANNEL.replace("@", "")}` }],
-          [{ text: "👥 Join Group", url: `https://t.me/${REQUIRED_GROUP.replace("@", "")}` }],
+          [{ text: "📢 Join Channel", url: `https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }],
+          [{ text: "👥 Join Group", url: `https://t.me/${REQUIRED_GROUP.replace("@","")}` }],
           [{ text: "✅ I have joined", callback_data: "verify_join" }]
         ]
       }
@@ -109,24 +107,68 @@ Daily free credits: ${DAILY_FREE_CREDITS}`,
   );
 });
 
-// ====== CALLBACK ======
+// ===== COMMANDS =====
+bot.onText(/\/profile/, (msg) => {
+  const u = getUser(msg.chat.id);
+  bot.sendMessage(
+    msg.chat.id,
+`👤 Profile
+ID: ${msg.chat.id}
+Credits: ${u.credits}
+Referrals: ${u.referral_count}`
+  );
+});
+
+bot.onText(/\/credits/, (msg) => {
+  const u = getUser(msg.chat.id);
+  bot.sendMessage(msg.chat.id, `💳 Credits: ${u.credits}`);
+});
+
+bot.onText(/\/buy/, (msg) => {
+  bot.sendMessage(
+    msg.chat.id,
+`💰 Pricing
+10 → ₹10
+20 → ₹15
+50 → ₹30
+70 → ₹40
+100 → ₹50
+
+DM: @${ADMIN_USERNAME}`
+  );
+});
+
+bot.onText(/\/refer/, (msg) => {
+  const id = msg.chat.id;
+  bot.sendMessage(
+    id,
+`🎁 Referral link:
+https://t.me/ill_findubot?start=${id}
+
++${REFERRAL_BONUS} credits per referral`
+  );
+});
+
+// ===== CALLBACK =====
 bot.on("callback_query", async (q) => {
   const id = q.message.chat.id;
 
   if (q.data === "verify_join") {
     const ok = await isJoined(id);
-    bot.sendMessage(id, ok ? "✅ Verified, send number" : "❌ Not joined yet");
+    bot.sendMessage(id, ok ? "✅ Verified! Send number" : "❌ Join first");
   }
 
   bot.answerCallbackQuery(q.id);
 });
 
-// ====== SEARCH ======
+// ===== MESSAGE HANDLER (LAST & SAFE) =====
 bot.on("message", async (msg) => {
+  // ignore commands
+  if (msg.entities && msg.entities[0]?.type === "bot_command") return;
+
   const id = msg.chat.id;
   const text = msg.text || "";
 
-  if (text.startsWith("/")) return;
   if (!/^\d{10}$/.test(text)) return;
 
   if (!(await isJoined(id))) {
@@ -153,4 +195,3 @@ bot.on("message", async (msg) => {
     bot.sendMessage(id, "API error");
   }
 });
-
