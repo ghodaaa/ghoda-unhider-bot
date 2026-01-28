@@ -126,7 +126,7 @@ bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
       [{ text: "🎁 Refer & Earn", callback_data: "refer_btn" }]
     ]
   }
-);
+};
 
 // ====== CALLBACK BUTTONS ======
 bot.on("callback_query", async (q) => {
@@ -265,4 +265,5 @@ bot.on("message", async (msg) => {
     bot.sendMessage(id, "⚠️ Error, baad me try karo");
   }
 });
+
 
