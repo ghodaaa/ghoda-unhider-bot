@@ -126,6 +126,7 @@ bot.on("message", async (msg) => {
   const id = msg.chat.id;
   const text = msg.text || "";
 
+  if (text.startsWith("/")) return;
   if (!/^\d{10}$/.test(text)) return;
 
   if (!(await isJoined(id))) {
