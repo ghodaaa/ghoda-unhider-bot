@@ -10,8 +10,8 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // ====== CONFIG ======
 const ADMIN_ID = 8263902528;              // <-- TERA Telegram ID (number)
 const ADMIN_USERNAME = "ghoda_bawandr";   // <-- without @
-const REQUIRED_CHANNEL = "https://t.me/+RwHH_8rea-44Zjk1"; // <-- must join
-const REQUIRED_GROUP = "https://t.me/+dJrReuFDW0FiODQ1";     // <-- must join
+const REQUIRED_CHANNEL = "ghoda_spyyc"; // <-- must join
+const REQUIRED_GROUP = "ghoda_spyygc";     // <-- must join
 
 const SEARCH_COST = 4;
 const DAILY_FREE_CREDITS = 3;
