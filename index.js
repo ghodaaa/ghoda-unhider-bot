@@ -8,10 +8,10 @@ const API_KEYS = process.env.API_KEYS.split(",");
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ====== CONFIG (SET THESE) ======
-const ADMIN_ID = 8263902528;               // <-- TERA Telegram ID
-const ADMIN_USERNAME = "@ghoda_bawandr";    // <-- @tera_username
-const REQUIRED_CHANNEL = "https://t.me/+RwHH_8rea-44Zjk1";  // <-- must join
-const REQUIRED_GROUP = "https://t.me/+dJrReuFDW0FiODQ1";      // <-- must join
+const ADMIN_ID = 123456789;               // <-- TERA Telegram ID (number)
+const ADMIN_USERNAME = "yourusername";    // <-- tera username (without @)
+const REQUIRED_CHANNEL = "@yourchannel";  // <-- must join
+const REQUIRED_GROUP = "@yourgroup";      // <-- must join
 
 const SEARCH_COST = 4;
 const DAILY_FREE_CREDITS = 3;
@@ -37,17 +37,15 @@ function initUser(id) {
     db.users[id] = {
       credits: DAILY_FREE_CREDITS,
       lastDaily: new Date().toDateString(),
-      referred: false,          // has this user already USED a referral?
-      referral_count: 0,        // how many people this user invited
-      invited_by: null          // who invited this user
+      referred: false,      // has this user already USED a referral?
+      referral_count: 0,    // how many people this user invited
+      invited_by: null      // who invited this user
     };
     saveDB();
   }
 }
-
 function getUser(id) {
   initUser(id);
-  // daily refill
   const today = new Date().toDateString();
   if (db.users[id].lastDaily !== today) {
     db.users[id].credits += DAILY_FREE_CREDITS;
@@ -69,65 +67,98 @@ async function isJoined(chatId) {
   }
 }
 
-// ====== START (REFERRAL WITH FAKE-PROOF) ======
+// ====== /START (WITH JOIN BUTTONS + VERIFY) ======
 bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
   const id = msg.chat.id;
   initUser(id);
 
-  // --- Referral handling ---
+  // ---- Referral (fake-proof) ----
   if (match && match[1]) {
     const referrerId = String(match[1]);
-
-    // Block self-referral
-    if (referrerId === String(id)) {
-      // silently ignore
-    } else {
-      // Referrer must exist in DB
-      if (db.users[referrerId] && !db.users[id].referred) {
-        // Credit referrer ONLY ONCE per user
-        db.users[referrerId].credits += REFERRAL_BONUS;
-        db.users[referrerId].referral_count += 1;
-
-        db.users[id].referred = true;
-        db.users[id].invited_by = referrerId;
-        saveDB();
-
-        bot.sendMessage(
-          id,
-          `🎁 Referral successful!\nInviter ko +${REFERRAL_BONUS} credits mile`
-        );
-      }
+    if (referrerId !== String(id) && db.users[referrerId] && !db.users[id].referred) {
+      db.users[referrerId].credits += REFERRAL_BONUS;
+      db.users[referrerId].referral_count += 1;
+      db.users[id].referred = true;
+      db.users[id].invited_by = referrerId;
+      saveDB();
+      bot.sendMessage(id, `🎁 Referral successful! Inviter ko +${REFERRAL_BONUS} credits mile`);
     }
   }
 
   bot.sendMessage(
     id,
-`🐎 Ghoda Unhider
+`🐎 *Ghoda Unhider*
 
-🔒 Use karne ke liye JOIN karo:
-• Channel: ${REQUIRED_CHANNEL}
-• Group: ${REQUIRED_GROUP}
+🔒 Use karne ke liye pehle JOIN karo
 
-💳 Credit System:
+💳 *Credit System*
 • 1 search = ${SEARCH_COST} credits
 • Daily free = ${DAILY_FREE_CREDITS} credits
 • Referral bonus = ${REFERRAL_BONUS} credits
 
-💰 Sabse KAM pricing (credit based):
+💰 *Sabse KAM pricing* (credit based)
 10→₹10 | 20→₹15 | 50→₹30 | 70→₹40 | 100→₹50
 
 👉 Credits ke liye DM: @${ADMIN_USERNAME}
 
-📱 10 digit mobile number bhejo`
-  );
+📱 10 digit mobile number bhejo`,
+{
+  parse_mode: "Markdown",
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: "📢 Join Channel", url: `https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }],
+      [{ text: "👥 Join Group", url: `https://t.me/${REQUIRED_GROUP.replace("@","")}` }],
+      [{ text: "✅ I have joined", callback_data: "verify_join" }],
+      [
+        { text: "👤 Profile", callback_data: "profile_btn" },
+        { text: "💳 Credits", callback_data: "credits_btn" }
+      ]
+    ]
+  }
+});
 });
 
-// ====== COMMANDS ======
-bot.onText(/\/credits/, (msg) => {
-  const u = getUser(msg.chat.id);
-  bot.sendMessage(msg.chat.id, `💳 Your credits: ${u.credits}`);
+// ====== CALLBACK BUTTONS ======
+bot.on("callback_query", async (query) => {
+  const chatId = query.message.chat.id;
+
+  if (query.data === "verify_join") {
+    const joined = await isJoined(chatId);
+    if (joined) {
+      bot.sendMessage(chatId, "✅ Verified! Ab 10 digit mobile number bhejo");
+    } else {
+      bot.sendMessage(chatId, "❌ Abhi join nahi kiya. Pehle Channel + Group join karo");
+    }
+  }
+
+  if (query.data === "profile_btn") {
+    const u = getUser(chatId);
+    const username = query.from.username ? `@${query.from.username}` : "Not set";
+    bot.sendMessage(
+      chatId,
+`👤 *Your Profile*
+
+🆔 User ID: ${chatId}
+👤 Username: ${username}
+
+💳 Credits: ${u.credits}
+👥 Referrals: ${u.referral_count}
+🔗 Invited by: ${u.invited_by || "—"}
+
+👉 Credits ke liye DM: @${ADMIN_USERNAME}`,
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  if (query.data === "credits_btn") {
+    const u = getUser(chatId);
+    bot.sendMessage(chatId, `💳 Your credits: ${u.credits}`);
+  }
+
+  bot.answerCallbackQuery(query.id);
 });
 
+// ====== TEXT COMMANDS (OPTIONAL) ======
 bot.onText(/\/profile/, (msg) => {
   const id = msg.chat.id;
   const u = getUser(id);
@@ -141,25 +172,26 @@ bot.onText(/\/profile/, (msg) => {
 
 💳 Credits: ${u.credits}
 👥 Referrals: ${u.referral_count}
-🔗 Invited by: ${u.invited_by || "—"}
 
 👉 Credits ke liye DM: @${ADMIN_USERNAME}`,
     { parse_mode: "Markdown" }
   );
 });
-
+bot.onText(/\/credits/, (msg) => {
+  const u = getUser(msg.chat.id);
+  bot.sendMessage(msg.chat.id, `💳 Your credits: ${u.credits}`);
+});
 bot.onText(/\/buy/, (msg) => {
   bot.sendMessage(
     msg.chat.id,
 `💰 Sabse KAM pricing (credit based)
 10→₹10 | 20→₹15 | 50→₹30 | 70→₹40 | 100→₹50
 
-👉 Credits ke liye DM karo:
-@${ADMIN_USERNAME}`
+👉 Credits ke liye DM: @${ADMIN_USERNAME}`
   );
 });
 
-// Admin: add credits
+// ====== ADMIN: ADD CREDITS ======
 bot.onText(/\/addcredits (\d+) (\d+)/, (msg, m) => {
   if (msg.from.id !== ADMIN_ID) return;
   const uid = m[1], amt = parseInt(m[2], 10);
@@ -179,12 +211,7 @@ bot.on("message", async (msg) => {
 
   const joined = await isJoined(id);
   if (!joined) {
-    bot.sendMessage(
-      id,
-`🔒 Pehle JOIN karo:
-• ${REQUIRED_CHANNEL}
-• ${REQUIRED_GROUP}`
-    );
+    bot.sendMessage(id, "🔒 Pehle join karo aur **I have joined** button dabao");
     return;
   }
 
