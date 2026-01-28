@@ -13,6 +13,7 @@ function getApiKey() {
   return key;
 }
 
+// /start command
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(
     msg.chat.id,
@@ -20,6 +21,7 @@ bot.onText(/\/start/, (msg) => {
   );
 });
 
+// message handler
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -33,16 +35,29 @@ bot.on("message", async (msg) => {
 
   try {
     const apiKey = getApiKey();
-
-    const url =
-      `https://numberinfo-clna.onrender.com/api/lookup` +
-      `?key=${apiKey}&mobile=${text}`;
-
+    const url = `https://numberinfo-clna.onrender.com/api/lookup?key=${apiKey}&mobile=${text}`;
     const res = await axios.get(url);
 
     let reply = "📊 Number Details\n\n";
-    for (let k in res.data) {
-      reply += `${k}: ${res.data[k]}\n`;
+
+    reply += `Response Time: ${res.data.response_time || "NA"}\n\n`;
+
+    if (Array.isArray(res.data.result) && res.data.result.length > 0) {
+      res.data.result.forEach((item, index) => {
+        reply += `🔹 Record ${index + 1}\n`;
+        reply += `Mobile: ${item.mobile || "NA"}\n`;
+        reply += `ID: ${item.id || "NA"}\n`;
+        reply += `Name: ${item.name || "NA"}\n`;
+        reply += `Father Name: ${item.father_name || "NA"}\n`;
+        reply += `Address: ${item.address || "NA"}\n`;
+        reply += `ID Number: ${item.id_number || "NA"}\n`;
+        reply += `Circle: ${item.circle || "NA"}\n`;
+        reply += `Email: ${item.email || "NA"}\n`;
+        reply += `Alt Mobile: ${item.alt_mobile || "NA"}\n`;
+        reply += `\n`;
+      });
+    } else {
+      reply += "No records found.";
     }
 
     bot.sendMessage(chatId, reply);
