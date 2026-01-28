@@ -8,10 +8,10 @@ const API_KEYS = process.env.API_KEYS.split(",");
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ====== CONFIG (SET THESE) ======
-const ADMIN_ID = 123456789;               // <-- TERA Telegram ID (number)
-const ADMIN_USERNAME = "yourusername";    // <-- tera username (without @)
-const REQUIRED_CHANNEL = "@yourchannel";  // <-- must join
-const REQUIRED_GROUP = "@yourgroup";      // <-- must join
+const ADMIN_ID = 8263902528;               // <-- TERA Telegram ID (number)
+const ADMIN_USERNAME = "ghoda_bawandr";    // <-- tera username (without @)
+const REQUIRED_CHANNEL = "https://t.me/+RwHH_8rea-44Zjk1";  // <-- must join
+const REQUIRED_GROUP = "https://t.me/+dJrReuFDW0FiODQ1";      // <-- must join
 
 const SEARCH_COST = 4;
 const DAILY_FREE_CREDITS = 3;
@@ -251,3 +251,4 @@ bot.on("message", async (msg) => {
     bot.sendMessage(id, "⚠️ Error, baad me try karo");
   }
 });
+
