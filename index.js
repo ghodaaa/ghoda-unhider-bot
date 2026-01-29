@@ -346,45 +346,77 @@ if (db.users[id]?.banned) {
     bot.sendMessage(id, "Not enough credits");
     return;
   }
+//logic lagaega and search dega
+try {
+  const res = await axios.get(
+    `https://numberinfo-clna.onrender.com/api/lookup?key=${getApiKey()}&mobile=${text}`
+  );
 
-  try {
-    const res = await axios.get(
-      `https://numberinfo-clna.onrender.com/api/lookup?key=${getApiKey()}&mobile=${text}`
-    );
+  const results = res.data?.result || [];
 
-    u.credits -= SEARCH_COST;
+  // ❌ RESULT EMPTY → SIRF 1 CREDIT
+  if (!Array.isArray(results) || results.length === 0) {
+    u.credits -= 1;
+    if (u.credits < 0) u.credits = 0;
     saveDB();
 
-let output = "📊 *Ghoda Unhider Result*\n\n";
+    bot.sendMessage(
+      id,
+`❌ Result not Found
+Search another & we deducted only 1 credit for our community
 
-(res.data.result || []).forEach((it, index) => {
-  output += `━━━━━━━━━━━━━━━━\n`;
-  output += `🔍 *Record #${index + 1}*\n\n`;
-
-  output += `👤 *Name:* ${it.name || "NA"}\n`;
-  output += `👨‍👦 *Father:* ${it.father_name || "NA"}\n`;
-  output += `📞 *Mobile:* ${it.mobile || "NA"}\n`;
-  output += `🆔 *ID Number:* ${it.id_number || "NA"}\n`;
-  output += `📡 *Circle:* ${it.circle || "NA"}\n`;
-
-  const cleanAddress = (it.address || "NA")
-    .replace(/\s+/g, " ")
-    .replace(/!/g, " ")
-    .trim();
-
-  output += `🏠 *Address:* ${cleanAddress}\n`;
-});
-
-output += `━━━━━━━━━━━━━━━━\n`;
-output += `💳 *Credits Left:* ${u.credits}\n`;
-output += `⚡ _Powered by Ghoda Unhider_`;
-
-bot.sendMessage(id, output, { parse_mode: "Markdown" });
-
-  } catch {
-    bot.sendMessage(id, "API error");
+💳 Remaining credits: ${u.credits}`
+    );
+    return;
   }
-});
+
+  // ✅ RESULT FOUND → FULL COST
+  u.credits -= SEARCH_COST;
+  if (u.credits < 0) u.credits = 0;
+  saveDB();
+
+  let output = "📊 *Ghoda Unhider Result*\n\n";
+
+  results.forEach((it, index) => {
+    output += `━━━━━━━━━━━━━━━━\n`;
+    output += `🔍 *Record #${index + 1}*\n\n`;
+
+    output += `👤 *Name:* ${it.name || "NA"}\n`;
+    output += `👨‍👦 *Father:* ${it.father_name || "NA"}\n`;
+    output += `📞 *Mobile:* ${it.mobile || "NA"}\n`;
+    output += `🆔 *ID Number:* ${it.id_number || "NA"}\n`;
+    output += `📡 *Circle:* ${it.circle || "NA"}\n`;
+
+    const cleanAddress = (it.address || "NA")
+      .replace(/\s+/g, " ")
+      .replace(/!/g, " ")
+      .trim();
+
+    output += `🏠 *Address:* ${cleanAddress}\n`;
+  });
+
+  output += `━━━━━━━━━━━━━━━━\n`;
+  output += `💳 *Credits Left:* ${u.credits}\n`;
+  output += `⚡ _Powered by Ghoda Unhider_`;
+
+  bot.sendMessage(id, output, { parse_mode: "Markdown" });
+
+} catch (err) {
+  // ❌ API ERROR → SIRF 1 CREDIT
+  u.credits -= 1;
+  if (u.credits < 0) u.credits = 0;
+  saveDB();
+
+  bot.sendMessage(
+    id,
+`❌ Result not Found
+Search another & we deducted only 1 credit for our community
+
+💳 Remaining credits: ${u.credits}`
+  );
+}
+
+
 
 
 
