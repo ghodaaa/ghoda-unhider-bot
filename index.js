@@ -415,6 +415,7 @@ Search another & we deducted only 1 credit for our community
 💳 Remaining credits: ${u.credits}`
   );
 }
+});
 
 
 
