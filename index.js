@@ -1,6 +1,13 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
+const http = require("http");
+
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Ghoda Unhider Bot is Alive 🐎");
+}).listen(process.env.PORT || 3000);
+
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const API_KEYS = (process.env.API_KEYS || "").split(",").filter(Boolean);
@@ -195,3 +202,4 @@ bot.on("message", async (msg) => {
     bot.sendMessage(id, "API error");
   }
 });
+
