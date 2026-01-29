@@ -138,11 +138,11 @@ bot.onText(/\/buy/, (msg) => {
   bot.sendMessage(
     msg.chat.id,
 `💰 Pricing
-10 → ₹10
-20 → ₹15
-50 → ₹30
-70 → ₹40
-100 → ₹50
+₹10 → 10 credits
+₹15 → 20 credits
+₹30 → 50 credits
+₹40 → 70 credits
+₹50 → 100 credits
 
 DM: @${ADMIN_USERNAME}`
   );
@@ -215,6 +215,40 @@ bot.onText(/\/stats/, (msg) => {
   );
 });
 
+// broadcasttt
+bot.onText(/\/broadcast (.+)/, async (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const message = match[1];
+  const users = Object.keys(db.users);
+
+  let success = 0;
+  let failed = 0;
+
+  for (const userId of users) {
+    try {
+      await bot.sendMessage(
+        userId,
+        `📢 *Admin Broadcast*\n\n${message}`,
+        { parse_mode: "Markdown" }
+      );
+      success++;
+    } catch (err) {
+      failed++;
+    }
+  }
+
+  bot.sendMessage(
+    msg.chat.id,
+`✅ *Broadcast Completed*
+
+👥 Total Users: ${users.length}
+📨 Sent: ${success}
+❌ Failed: ${failed}`,
+    { parse_mode: "Markdown" }
+  );
+});
+
 // ===== CALLBACK =====
 bot.on("callback_query", async (q) => {
   const id = q.message.chat.id;
@@ -237,7 +271,7 @@ bot.on("message", async (msg) => {
   
   // 🚫 BAN CHECK
 if (db.users[id]?.banned) {
-  bot.sendMessage(id, "🚫 You are banned from using this bot. Contact to Admin MF");
+  bot.sendMessage(id, "🚫 You are banned from using this bot. Contact to Admin MF @ghoda_bawandr");
   return;
 }
 
@@ -292,6 +326,7 @@ bot.sendMessage(id, output, { parse_mode: "Markdown" });
     bot.sendMessage(id, "API error");
   }
 });
+
 
 
 
