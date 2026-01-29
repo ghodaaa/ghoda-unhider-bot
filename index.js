@@ -40,6 +40,8 @@ if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE));
 function saveDB() {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
+// 🔒 GLOBAL PROTECTED NUMBERS (ADMIN)
+db.protected_numbers = db.protected_numbers || [];
 
 // ===== USERS ===== ban checkk
 function initUser(id) {
@@ -49,7 +51,8 @@ function initUser(id) {
       lastDaily: new Date().toDateString(),
       referred: false,
       referral_count: 0,
-      banned: false
+      banned: false,
+      protected_numbers: [] // user ke protected numbers
     };
     saveDB();
   }
@@ -81,6 +84,10 @@ async function isJoined(chatId) {
 bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
   const id = msg.chat.id;
   initUser(id);
+  
+//list all ke liye container
+  db.users[id].username = msg.from.username || null;
+saveDB();
 
   // referral
   if (match && match[1]) {
@@ -158,6 +165,26 @@ https://t.me/ill_findubot?start=${id}
 +${REFERRAL_BONUS} credits per referral`
   );
 });
+bot.onText(/\/protectme (\d{10})/, (msg, match) => {
+  const id = msg.chat.id;
+  const number = match[1];
+  initUser(id);
+
+  const u = db.users[id];
+  if (u.credits < 100) {
+    bot.sendMessage(id, "❌ Need 100 credits to protect your number.");
+    return;
+  }
+
+  if (!u.protected_numbers.includes(number)) {
+    u.protected_numbers.push(number);
+    u.credits -= 100;
+    saveDB();
+  }
+
+  bot.sendMessage(id, `🔒 Your number ${number} is now protected.`);
+});
+
 //admin command for add credit
 bot.onText(/\/addcredits (\d+) (\d+)/, (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
@@ -248,6 +275,38 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     { parse_mode: "Markdown" }
   );
 });
+// admin protect numnerr
+bot.onText(/\/protectnumber (\d{10})/, (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const number = match[1];
+  db.protected_numbers = db.protected_numbers || [];
+  if (!db.protected_numbers.includes(number)) {
+    db.protected_numbers.push(number);
+    saveDB();
+  }
+
+  bot.sendMessage(msg.chat.id, `🔒 Number ${number} protected (admin).`);
+});
+// admin list all
+bot.onText(/\/listall/, (msg) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const users = Object.entries(db.users);
+  if (users.length === 0) {
+    bot.sendMessage(msg.chat.id, "No users found.");
+    return;
+  }
+
+  let out = "👥 *User List*\n\n";
+  users.forEach(([id, u], i) => {
+    out += `#${i + 1}\n`;
+    out += `🆔 ID: ${id}\n`;
+    out += `👤 Username: ${u.username || "NA"}\n\n`;
+  });
+
+  bot.sendMessage(msg.chat.id, out, { parse_mode: "Markdown" });
+});
 
 // ===== CALLBACK =====
 bot.on("callback_query", async (q) => {
@@ -326,6 +385,7 @@ bot.sendMessage(id, output, { parse_mode: "Markdown" });
     bot.sendMessage(id, "API error");
   }
 });
+
 
 
 
