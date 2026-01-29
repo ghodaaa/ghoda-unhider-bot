@@ -21,9 +21,9 @@ const ADMIN_USERNAME = "ghoda_bawandr";
 const REQUIRED_CHANNEL = "@ghoda_spyyc";
 const REQUIRED_GROUP  = "@ghoda_spyygc";
 
-const SEARCH_COST = 1;
+const SEARCH_COST = 3;
 const DAILY_FREE_CREDITS = 3;
-const REFERRAL_BONUS = 10;
+const REFERRAL_BONUS = 7;
 
 // ===== API KEY ROTATION =====
 let keyIndex = 0;
@@ -292,6 +292,7 @@ bot.sendMessage(id, output, { parse_mode: "Markdown" });
     bot.sendMessage(id, "API error");
   }
 });
+
 
 
 
