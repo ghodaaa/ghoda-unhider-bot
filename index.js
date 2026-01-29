@@ -199,6 +199,36 @@ bot.onText(/\/addcredits (\d+) (\d+)/, (msg, match) => {
   bot.sendMessage(msg.chat.id, `✅ ${amount} credits added to ${userId}`);
   bot.sendMessage(userId, `💳 Admin added ${amount} credits to your account`);
 });
+//deduct credit admin commandddd
+bot.onText(/\/deductcredits (\d+) (\d+)/, (msg, match) => {
+  // 👑 Only admin
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const userId = match[1];
+  const amount = parseInt(match[2], 10);
+
+  // user exist ensure
+  initUser(userId);
+  const u = db.users[userId];
+
+  // deduct logic (no negative)
+  u.credits -= amount;
+  if (u.credits < 0) u.credits = 0;
+  saveDB();
+
+  // notify admin
+  bot.sendMessage(
+    msg.chat.id,
+    `✅ Deducted ${amount} credits from ${userId}\n💳 Remaining: ${u.credits}`
+  );
+
+  // notify user (optional but professional)
+  bot.sendMessage(
+    userId,
+    `⚠️ Admin deducted ${amount} credits from your account.\n💳 Remaining credits: ${u.credits}`
+  );
+});
+
 
 // ban command
 bot.onText(/\/ban (\d+)/, (msg, match) => {
@@ -416,6 +446,7 @@ Search another & we deducted only 1 credit for our community
   );
 }
 });
+
 
 
 
