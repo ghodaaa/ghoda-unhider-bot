@@ -41,14 +41,14 @@ function saveDB() {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-// ===== USERS =====
+// ===== USERS ===== ban checkk
 function initUser(id) {
   if (!db.users[id]) {
     db.users[id] = {
       credits: DAILY_FREE_CREDITS,
       lastDaily: new Date().toDateString(),
       referred: false,
-      referral_count: 0
+      referral_count: 0,
       banned: false
     };
     saveDB();
@@ -292,6 +292,7 @@ bot.sendMessage(id, output, { parse_mode: "Markdown" });
     bot.sendMessage(id, "API error");
   }
 });
+
 
 
 
