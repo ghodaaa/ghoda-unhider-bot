@@ -2,6 +2,8 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
 const http = require("http");
+const ADMIN_ID = 6668112301; 
+
 
 http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
@@ -47,6 +49,7 @@ function initUser(id) {
       lastDaily: new Date().toDateString(),
       referred: false,
       referral_count: 0
+      banned: false
     };
     saveDB();
   }
@@ -155,6 +158,62 @@ https://t.me/ill_findubot?start=${id}
 +${REFERRAL_BONUS} credits per referral`
   );
 });
+//admin command for add credit
+bot.onText(/\/addcredits (\d+) (\d+)/, (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const userId = match[1];
+  const amount = parseInt(match[2], 10);
+
+  initUser(userId);
+  db.users[userId].credits += amount;
+  saveDB();
+
+  bot.sendMessage(msg.chat.id, `✅ ${amount} credits added to ${userId}`);
+  bot.sendMessage(userId, `💳 Admin added ${amount} credits to your account`);
+});
+
+// ban command
+bot.onText(/\/ban (\d+)/, (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const userId = match[1];
+  initUser(userId);
+  db.users[userId].banned = true;
+  saveDB();
+
+  bot.sendMessage(msg.chat.id, `🚫 User ${userId} banned`);
+  bot.sendMessage(userId, "🚫 You have been banned by admin");
+});
+// Uer unbann
+bot.onText(/\/unban (\d+)/, (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const userId = match[1];
+  initUser(userId);
+  db.users[userId].banned = false;
+  saveDB();
+
+  bot.sendMessage(msg.chat.id, `✅ User ${userId} unbanned`);
+  bot.sendMessage(userId, "✅ You have been unbanned");
+});
+
+// ststsss
+bot.onText(/\/stats/, (msg) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const totalUsers = Object.keys(db.users).length;
+  const bannedUsers = Object.values(db.users).filter(u => u.banned).length;
+
+  bot.sendMessage(
+    msg.chat.id,
+`📊 *Bot Stats*
+
+👥 Total Users: ${totalUsers}
+🚫 Banned Users: ${bannedUsers}`,
+    { parse_mode: "Markdown" }
+  );
+});
 
 // ===== CALLBACK =====
 bot.on("callback_query", async (q) => {
@@ -175,6 +234,12 @@ bot.on("message", async (msg) => {
 
   const id = msg.chat.id;
   const text = msg.text || "";
+  
+  // 🚫 BAN CHECK
+if (db.users[id]?.banned) {
+  bot.sendMessage(id, "🚫 You are banned from using this bot. Contact to Admin MF");
+  return;
+}
 
   if (!/^\d{10}$/.test(text)) return;
 
@@ -227,6 +292,7 @@ bot.sendMessage(id, output, { parse_mode: "Markdown" });
     bot.sendMessage(id, "API error");
   }
 });
+
 
 
 
