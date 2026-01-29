@@ -197,9 +197,35 @@ bot.on("message", async (msg) => {
     u.credits -= SEARCH_COST;
     saveDB();
 
-    bot.sendMessage(id, JSON.stringify(res.data.result, null, 2));
+let output = "📊 *Ghoda Unhider Result*\n\n";
+
+(res.data.result || []).forEach((it, index) => {
+  output += `━━━━━━━━━━━━━━━━\n`;
+  output += `🔍 *Record #${index + 1}*\n\n`;
+
+  output += `👤 *Name:* ${it.name || "NA"}\n`;
+  output += `👨‍👦 *Father:* ${it.father_name || "NA"}\n`;
+  output += `📞 *Mobile:* ${it.mobile || "NA"}\n`;
+  output += `🆔 *ID Number:* ${it.id_number || "NA"}\n`;
+  output += `📡 *Circle:* ${it.circle || "NA"}\n`;
+
+  const cleanAddress = (it.address || "NA")
+    .replace(/\s+/g, " ")
+    .replace(/!/g, " ")
+    .trim();
+
+  output += `🏠 *Address:* ${cleanAddress}\n`;
+});
+
+output += `━━━━━━━━━━━━━━━━\n`;
+output += `💳 *Credits Left:* ${u.credits}\n`;
+output += `⚡ _Powered by Ghoda Unhider_`;
+
+bot.sendMessage(id, output, { parse_mode: "Markdown" });
+
   } catch {
     bot.sendMessage(id, "API error");
   }
 });
+
 
