@@ -428,6 +428,9 @@ bot.on("message", async (msg) => {
 
   const id = msg.chat.id;
   const text = msg.text || "";
+  // 🔥 INIT USER FIRST (VERY IMPORTANT)
+  initUser(id);
+  const u = db.users[id];
   
   // 🚫 BAN CHECK
 if (db.users[id]?.banned) {
@@ -447,10 +450,6 @@ if (db.users[id]?.banned) {
     return;
   }
   // ===== 🔒 PROTECTED NUMBER CHECK =====
-
-// ensure user exists
-initUser(id);
-const u = db.users[id];
 
 // collect all protected numbers
 const adminProtected = db.protected_numbers || [];
@@ -550,6 +549,7 @@ Search another & we deducted only 1 credit for our community
   );
 }
 });
+
 
 
 
