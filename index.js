@@ -442,7 +442,6 @@ if (db.users[id]?.banned) {
     return;
   }
 
-  const u = getUser(id);
   if (u.credits < SEARCH_COST) {
     bot.sendMessage(id, "Not enough credits");
     return;
@@ -551,6 +550,7 @@ Search another & we deducted only 1 credit for our community
   );
 }
 });
+
 
 
 
