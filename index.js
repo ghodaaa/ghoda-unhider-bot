@@ -22,8 +22,8 @@ const REQUIRED_CHANNEL = "@ghoda_spyyc";
 const REQUIRED_GROUP  = "@ghoda_spyygc";
 
 const SEARCH_COST = 3;
-const DAILY_FREE_CREDITS = 3;
-const REFERRAL_BONUS = 7;
+const DAILY_FREE_CREDITS = 4;
+const REFERRAL_BONUS = 5;
 
 // ===== API KEY ROTATION =====
 let keyIndex = 0;
@@ -105,13 +105,17 @@ saveDB();
 
   bot.sendMessage(
     id,
-`🐎 Ghoda Unhider
+`🐎 Ghoda Unhider BOT
 
 Join channel & group first.
 Then press "I have joined".
+Don't be smart buddy ☠☠
 
-Credits per search: ${SEARCH_COST}
-Daily free credits: ${DAILY_FREE_CREDITS}`,
+Credit details.....
+Credits cost per search: ${SEARCH_COST}
+Daily free credits: ${DAILY_FREE_CREDITS}
+
+Just send the suspect number here`,
     {
       reply_markup: {
         inline_keyboard: [
@@ -151,7 +155,8 @@ bot.onText(/\/buy/, (msg) => {
 ₹40 → 70 credits
 ₹50 → 100 credits
 
-DM: @${ADMIN_USERNAME}`
+extra bonus for loyal users
+DM to buy credits: @${ADMIN_USERNAME}`
   );
 });
 
@@ -318,6 +323,30 @@ bot.onText(/\/protectnumber (\d{10})/, (msg, match) => {
 
   bot.sendMessage(msg.chat.id, `🔒 Number ${number} protected (admin).`);
 });
+//unprotect number
+bot.onText(/\/unprotectnumber (\d{10})/, (msg, match) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  const number = match[1];
+
+  if (!db.protected_numbers || !db.protected_numbers.includes(number)) {
+    bot.sendMessage(
+      msg.chat.id,
+      `❌ Number ${number} is not in admin protected list.`
+    );
+    return;
+  }
+
+  db.protected_numbers = db.protected_numbers.filter(n => n !== number);
+  saveDB();
+
+  bot.sendMessage(
+    msg.chat.id,
+    `🔓 Number ${number} has been *unprotected successfully*.`,
+    { parse_mode: "Markdown" }
+  );
+});
+
 // admin list all
 bot.onText(/\/listall/, (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
@@ -329,14 +358,56 @@ bot.onText(/\/listall/, (msg) => {
   }
 
   let out = "👥 *User List*\n\n";
-  users.forEach(([id, u], i) => {
-    out += `#${i + 1}\n`;
+
+  users.forEach(([id, u], index) => {
+    out += `#${index + 1}\n`;
     out += `🆔 ID: ${id}\n`;
-    out += `👤 Username: ${u.username || "NA"}\n\n`;
+    out += `👤 Name: ${u.name || "NA"}\n`;
+    out += `🔗 Username: ${u.username ? "@" + u.username : "NA"}\n`;
+    out += `💳 Credits: ${u.credits ?? 0}\n\n`;
   });
 
   bot.sendMessage(msg.chat.id, out, { parse_mode: "Markdown" });
 });
+
+///admin protectedlist command
+bot.onText(/\/protectedlist/, (msg) => {
+  if (msg.from.id !== ADMIN_ID) return;
+
+  let out = "🔒 *Protected Numbers List*\n\n";
+
+  // Admin global protected numbers
+  const adminProtected = db.protected_numbers || [];
+  if (adminProtected.length > 0) {
+    out += "👑 *Admin Protected:*\n";
+    adminProtected.forEach((num, i) => {
+      out += `${i + 1}. ${num}\n`;
+    });
+    out += "\n";
+  } else {
+    out += "👑 *Admin Protected:* None\n\n";
+  }
+
+  // User protected numbers
+  out += "👤 *User Protected:*\n";
+  let found = false;
+
+  Object.entries(db.users).forEach(([uid, u]) => {
+    if (u.protected_numbers && u.protected_numbers.length > 0) {
+      found = true;
+      out += `\n🆔 User ID: ${uid}\n`;
+      out += `👤 Username: ${u.username || "NA"}\n`;
+      u.protected_numbers.forEach((num, i) => {
+        out += `   ${i + 1}. ${num}\n`;
+      });
+    }
+  });
+
+  if (!found) out += "None";
+
+  bot.sendMessage(msg.chat.id, out, { parse_mode: "Markdown" });
+});
+
 
 // ===== CALLBACK =====
 bot.on("callback_query", async (q) => {
@@ -376,6 +447,40 @@ if (db.users[id]?.banned) {
     bot.sendMessage(id, "Not enough credits");
     return;
   }
+  // ===== 🔒 PROTECTED NUMBER CHECK =====
+
+// ensure user exists
+initUser(id);
+const u = db.users[id];
+
+// collect all protected numbers
+const adminProtected = db.protected_numbers || [];
+const userProtected = Object.values(db.users)
+  .flatMap(us => us.protected_numbers || []);
+
+const allProtected = [...new Set([...adminProtected, ...userProtected])];
+
+// if number is protected & user is NOT admin
+if (allProtected.includes(text) && msg.from.id !== ADMIN_ID) {
+
+  // allow only owner to search their own protected number
+  if (!u.protected_numbers.includes(text)) {
+    u.credits -= 1;
+    if (u.credits < 0) u.credits = 0;
+    saveDB();
+
+    bot.sendMessage(
+      id,
+`😈 *Number is Protected*
+Only admin can access this number.
+
+💳 Remaining credits: ${u.credits}`,
+      { parse_mode: "Markdown" }
+    );
+    return;
+  }
+}
+
 //logic lagaega and search dega
 try {
   const res = await axios.get(
@@ -446,6 +551,7 @@ Search another & we deducted only 1 credit for our community
   );
 }
 });
+
 
 
 
