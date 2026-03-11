@@ -1,3 +1,11 @@
+const http = require("http");
+
+http.createServer((req,res)=>{
+  res.writeHead(200, {"Content-Type":"text/plain"});
+  res.end("Bot is running");
+}).listen(process.env.PORT || 3000);
+
+//=====
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
@@ -93,15 +101,64 @@ return false;
 }
 
 // ===== START =====
-bot.onText(/\/start(?:\s+(\d+))?/,async(msg,match)=>{
+bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
 
-const id=msg.chat.id;
+const id = msg.chat.id;
 
 initUser(id);
 
-db.users[id].username=msg.from.username || null;
+db.users[id].username = msg.from.username || null;
 saveDB();
 
+bot.sendMessage(
+id,
+`🐎 Ghoda Unhider BOT
+
+Join channel & group first.
+Then press "I have joined".
+
+Credits cost per search: ${SEARCH_COST}
+Daily free credits: ${DAILY_FREE_CREDITS}
+
+After verification send the suspect number`,
+{
+reply_markup:{
+inline_keyboard:[
+[
+{ text:"📢 Join Channel", url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }
+],
+[
+{ text:"👥 Join Group", url:`https://t.me/${REQUIRED_GROUP.replace("@","")}` }
+],
+[
+{ text:"✅ I have joined", callback_data:"verify_join" }
+]
+]
+}
+}
+);
+
+});
+
+bot.on("callback_query", async (q) => {
+
+const id = q.message.chat.id;
+
+if(q.data === "verify_join"){
+
+const ok = await isJoined(id);
+
+if(ok){
+bot.sendMessage(id,"✅ Verified! Now send the number.");
+}else{
+bot.sendMessage(id,"❌ First join the channel and group.");
+}
+
+}
+
+bot.answerCallbackQuery(q.id);
+
+});
 // referral
 if(match && match[1]){
 
@@ -370,3 +427,4 @@ bot.sendMessage(id,"❌ API error");
 }
 
 });
+
