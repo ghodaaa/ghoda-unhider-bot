@@ -1,39 +1,27 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
-const http = require("http");
+
+// ===== BOT TOKEN =====
+const BOT_TOKEN = "8203325157:AAFbx4v_p4Pbp2rOldglQVfzSVjJviq97Lw";
+
+// ===== API =====
+const API_URL = "https://ansh-apis.is-dev.org/api/numinfo";
+const API_KEY = "ansh&num";
 
 const ADMIN_ID = 6668112301;
-
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const API_KEY = process.env.API_KEY;
-const RENDER_URL = process.env.RENDER_URL;
-
-// ===== RENDER SERVER =====
-http.createServer((req,res)=>{
-res.writeHead(200,{"Content-Type":"text/plain"});
-res.end("Ghoda Unhider Bot is Alive 🐎");
-}).listen(process.env.PORT || 3000);
-
-// ===== AUTO PINGER =====
-if(RENDER_URL){
-setInterval(()=>{
-axios.get(RENDER_URL).catch(()=>{});
-},300000);
-}
-
-const bot = new TelegramBot(BOT_TOKEN,{polling:true});
-
-bot.on("polling_error",(err)=>console.log(err));
-
-// ===== CONFIG =====
 const ADMIN_USERNAME = "ghoda_bawandr";
+
 const REQUIRED_CHANNEL = "@ghoda_spyyc";
 const REQUIRED_GROUP = "@ghoda_spyygc";
 
 const SEARCH_COST = 3;
 const DAILY_FREE_CREDITS = 4;
 const REFERRAL_BONUS = 5;
+
+const bot = new TelegramBot(BOT_TOKEN,{polling:true});
+
+bot.on("polling_error",(err)=>console.log(err));
 
 // ===== DATABASE =====
 const DB_FILE="users.json";
@@ -47,7 +35,7 @@ function saveDB(){
 fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2));
 }
 
-db.protected_numbers=db.protected_numbers||[];
+db.protected_numbers=db.protected_numbers || [];
 
 // ===== USER INIT =====
 function initUser(id){
@@ -64,7 +52,6 @@ protected_numbers:[]
 };
 
 saveDB();
-
 }
 
 }
@@ -85,7 +72,6 @@ saveDB();
 }
 
 return db.users[id];
-
 }
 
 // ===== JOIN CHECK =====
@@ -101,9 +87,7 @@ const ok=(x)=>["member","administrator","creator"].includes(x.status);
 return ok(c)&&ok(g);
 
 }catch{
-
 return false;
-
 }
 
 }
@@ -115,7 +99,7 @@ const id=msg.chat.id;
 
 initUser(id);
 
-db.users[id].username=msg.from.username||null;
+db.users[id].username=msg.from.username || null;
 saveDB();
 
 // referral
@@ -132,8 +116,8 @@ db.users[id].referred=true;
 
 saveDB();
 
-bot.sendMessage(id,"🎁 Referral successful!");
-bot.sendMessage(ref,`🎉 New referral! +${REFERRAL_BONUS} credits`);
+bot.sendMessage(id,"🎁 Referral successful");
+bot.sendMessage(ref,`🎉 New referral +${REFERRAL_BONUS} credits`);
 
 }
 
@@ -143,21 +127,11 @@ bot.sendMessage(id,
 `🐎 Ghoda Unhider BOT
 
 Join channel & group first
-Then press "I have joined"
 
 Credits per search: ${SEARCH_COST}
 Daily free credits: ${DAILY_FREE_CREDITS}
 
-Send suspect number`,
-{
-reply_markup:{
-inline_keyboard:[
-[{text:"📢 Join Channel",url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}`}],
-[{text:"👥 Join Group",url:`https://t.me/${REQUIRED_GROUP.replace("@","")}`}],
-[{text:"✅ I have joined",callback_data:"verify_join"}]
-]
-}
-});
+Send suspect number`);
 
 });
 
@@ -168,6 +142,7 @@ const u=getUser(msg.chat.id);
 
 bot.sendMessage(msg.chat.id,
 `👤 Profile
+
 ID: ${msg.chat.id}
 Credits: ${u.credits}
 Referrals: ${u.referral_count}`);
@@ -188,6 +163,7 @@ bot.onText(/\/buy/,msg=>{
 
 bot.sendMessage(msg.chat.id,
 `💰 Pricing
+
 ₹10 → 10 credits
 ₹15 → 20 credits
 ₹30 → 50 credits
@@ -205,6 +181,7 @@ const id=msg.chat.id;
 
 bot.sendMessage(id,
 `🎁 Referral link
+
 https://t.me/ill_findubot?start=${id}
 
 +${REFERRAL_BONUS} credits per referral`);
@@ -225,29 +202,7 @@ db.users[userId].credits+=amount;
 
 saveDB();
 
-bot.sendMessage(msg.chat.id,`✅ Added ${amount} credits`);
-bot.sendMessage(userId,`💳 Admin added ${amount} credits`);
-
-});
-
-// ===== ADMIN DEDUCT CREDIT =====
-bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const userId=match[1];
-const amount=parseInt(match[2]);
-
-initUser(userId);
-
-db.users[userId].credits-=amount;
-
-if(db.users[userId].credits<0)
-db.users[userId].credits=0;
-
-saveDB();
-
-bot.sendMessage(msg.chat.id,"✅ Credits deducted");
+bot.sendMessage(msg.chat.id,"Credits added");
 
 });
 
@@ -264,7 +219,7 @@ db.users[userId].banned=true;
 
 saveDB();
 
-bot.sendMessage(msg.chat.id,`🚫 User ${userId} banned`);
+bot.sendMessage(msg.chat.id,"User banned");
 
 });
 
@@ -281,62 +236,7 @@ db.users[userId].banned=false;
 
 saveDB();
 
-bot.sendMessage(msg.chat.id,`✅ User ${userId} unbanned`);
-
-});
-
-// ===== STATS =====
-bot.onText(/\/stats/,msg=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const total=Object.keys(db.users).length;
-const banned=Object.values(db.users).filter(u=>u.banned).length;
-
-bot.sendMessage(msg.chat.id,
-`📊 Bot Stats
-
-Users: ${total}
-Banned: ${banned}`);
-
-});
-
-// ===== BROADCAST =====
-bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const message=match[1];
-const users=Object.keys(db.users);
-
-for(const id of users){
-
-try{
-await bot.sendMessage(id,`📢 Admin Broadcast
-
-${message}`);
-}catch{}
-
-}
-
-bot.sendMessage(msg.chat.id,"✅ Broadcast sent");
-
-});
-
-// ===== CALLBACK =====
-bot.on("callback_query",async(q)=>{
-
-const id=q.message.chat.id;
-
-if(q.data==="verify_join"){
-
-const ok=await isJoined(id);
-
-bot.sendMessage(id, ok ? "✅ Verified" : "❌ Join first");
-
-}
-
-bot.answerCallbackQuery(q.id);
+bot.sendMessage(msg.chat.id,"User unbanned");
 
 });
 
@@ -346,19 +246,17 @@ bot.on("message",async(msg)=>{
 if(msg.entities && msg.entities[0]?.type==="bot_command") return;
 
 const id=msg.chat.id;
-const text=msg.text||"";
+const text=msg.text || "";
 
 initUser(id);
 
 const u=db.users[id];
 
-// ban check
 if(u.banned){
 bot.sendMessage(id,"🚫 You are banned");
 return;
 }
 
-// number check
 if(!/^\d{10}$/.test(text)) return;
 
 if(!(await isJoined(id))){
@@ -373,61 +271,50 @@ return;
 
 try{
 
-const res=await axios.get(
-`https://ansh-apis.is-dev.org/api/numinfo?key=${API_KEY}&num=${text}`
-);
+const res=await axios.get(`${API_URL}?key=${API_KEY}&num=${text}`);
 
 const results=res.data?.result || [];
 
 if(results.length===0){
 
-u.credits-=1;
-
+u.credits -= 1;
 saveDB();
 
-bot.sendMessage(id,
-`❌ Result not found
-
-💳 Credits left: ${u.credits}`);
+bot.sendMessage(id,"❌ Result not found");
 
 return;
 
 }
 
-u.credits-=SEARCH_COST;
-
+u.credits -= SEARCH_COST;
 saveDB();
 
-let out="📊 Ghoda Unhider Result\n\n";
+let output="📊 Ghoda Unhider Result\n\n";
 
 results.forEach((r,i)=>{
 
-out+=`Record #${i+1}
+output+=`Record #${i+1}
 
-Name: ${r.name||"NA"}
-Father: ${r.father_name||"NA"}
-Mobile: ${r.mobile||"NA"}
-Circle: ${r.circle||"NA"}
-Address: ${r.address||"NA"}
+👤 Name: ${r.name || "NA"}
+👨 Father: ${r.father_name || "NA"}
+📞 Mobile: ${r.mobile || text}
+📡 Circle: ${r.circle || "NA"}
+🆔 ID: ${r.id_number || "NA"}
+🏠 Address: ${r.address || "NA"}
 
 `;
 
 });
 
-out+=`💳 Credits left: ${u.credits}`;
+output+=`💳 Credits left: ${u.credits}`;
 
-bot.sendMessage(id,out);
+bot.sendMessage(id,output);
 
-}catch(e){
+}catch(err){
 
-u.credits-=1;
+console.log(err);
 
-saveDB();
-
-bot.sendMessage(id,
-`❌ Result not found
-
-💳 Credits left: ${u.credits}`);
+bot.sendMessage(id,"❌ API error");
 
 }
 
