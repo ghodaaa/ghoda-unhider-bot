@@ -110,6 +110,27 @@ initUser(id);
 db.users[id].username = msg.from.username || null;
 saveDB();
 
+// referral
+if(match && match[1]){
+
+const ref = match[1];
+
+if(ref !== String(id) && db.users[ref] && !db.users[id].referred){
+
+db.users[ref].credits += REFERRAL_BONUS;
+db.users[ref].referral_count += 1;
+
+db.users[id].referred = true;
+
+saveDB();
+
+bot.sendMessage(id,"🎁 Referral successful");
+bot.sendMessage(ref,`🎉 New referral +${REFERRAL_BONUS} credits`);
+
+}
+
+}
+
 bot.sendMessage(
 id,
 `🐎 Ghoda Unhider BOT
@@ -137,26 +158,6 @@ inline_keyboard:[
 }
 }
 );
-
-});
-
-bot.on("callback_query", async (q) => {
-
-const id = q.message.chat.id;
-
-if(q.data === "verify_join"){
-
-const ok = await isJoined(id);
-
-if(ok){
-bot.sendMessage(id,"✅ Verified! Now send the number.");
-}else{
-bot.sendMessage(id,"❌ First join the channel and group.");
-}
-
-}
-
-bot.answerCallbackQuery(q.id);
 
 });
 // referral
@@ -427,4 +428,5 @@ bot.sendMessage(id,"❌ API error");
 }
 
 });
+
 
