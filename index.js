@@ -2,152 +2,191 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
 const http = require("http");
-const ADMIN_ID = 6668112301; 
 
-
-http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("Ghoda Unhider Bot is Alive 🐎");
-}).listen(process.env.PORT || 3000);
-
+const ADMIN_ID = 6668112301;
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const API_KEYS = (process.env.API_KEYS || "").split(",").filter(Boolean);
+const API_KEY = process.env.API_KEY;
+const RENDER_URL = process.env.RENDER_URL;
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+// ===== RENDER SERVER =====
+http.createServer((req,res)=>{
+res.writeHead(200,{"Content-Type":"text/plain"});
+res.end("Ghoda Unhider Bot is Alive 🐎");
+}).listen(process.env.PORT || 3000);
+
+// ===== AUTO PINGER =====
+if(RENDER_URL){
+setInterval(()=>{
+axios.get(RENDER_URL).catch(()=>{});
+},300000);
+}
+
+const bot = new TelegramBot(BOT_TOKEN,{polling:true});
+
+bot.on("polling_error",(err)=>console.log(err));
 
 // ===== CONFIG =====
 const ADMIN_USERNAME = "ghoda_bawandr";
 const REQUIRED_CHANNEL = "@ghoda_spyyc";
-const REQUIRED_GROUP  = "@ghoda_spyygc";
+const REQUIRED_GROUP = "@ghoda_spyygc";
 
 const SEARCH_COST = 3;
 const DAILY_FREE_CREDITS = 4;
 const REFERRAL_BONUS = 5;
 
-// ===== API KEY ROTATION =====
-let keyIndex = 0;
-function getApiKey() {
-  const k = API_KEYS[keyIndex];
-  keyIndex = (keyIndex + 1) % API_KEYS.length;
-  return k;
+// ===== DATABASE =====
+const DB_FILE="users.json";
+let db={users:{}};
+
+if(fs.existsSync(DB_FILE)){
+db=JSON.parse(fs.readFileSync(DB_FILE));
 }
 
-// ===== DB =====
-const DB_FILE = "users.json";
-let db = { users: {} };
-if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE));
-function saveDB() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+function saveDB(){
+fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2));
 }
-// 🔒 GLOBAL PROTECTED NUMBERS (ADMIN)
-db.protected_numbers = db.protected_numbers || [];
 
-// ===== USERS ===== ban checkk
-function initUser(id) {
-  if (!db.users[id]) {
-    db.users[id] = {
-      credits: DAILY_FREE_CREDITS,
-      lastDaily: new Date().toDateString(),
-      referred: false,
-      referral_count: 0,
-      banned: false,
-      protected_numbers: [] // user ke protected numbers
-    };
-    saveDB();
-  }
+db.protected_numbers=db.protected_numbers||[];
+
+// ===== USER INIT =====
+function initUser(id){
+
+if(!db.users[id]){
+
+db.users[id]={
+credits:DAILY_FREE_CREDITS,
+lastDaily:new Date().toDateString(),
+referred:false,
+referral_count:0,
+banned:false,
+protected_numbers:[]
+};
+
+saveDB();
+
 }
-function getUser(id) {
-  initUser(id);
-  const today = new Date().toDateString();
-  if (db.users[id].lastDaily !== today) {
-    db.users[id].credits += DAILY_FREE_CREDITS;
-    db.users[id].lastDaily = today;
-    saveDB();
-  }
-  return db.users[id];
+
+}
+
+function getUser(id){
+
+initUser(id);
+
+const today=new Date().toDateString();
+
+if(db.users[id].lastDaily!==today){
+
+db.users[id].credits+=DAILY_FREE_CREDITS;
+db.users[id].lastDaily=today;
+
+saveDB();
+
+}
+
+return db.users[id];
+
 }
 
 // ===== JOIN CHECK =====
-async function isJoined(chatId) {
-  try {
-    const c = await bot.getChatMember(REQUIRED_CHANNEL, chatId);
-    const g = await bot.getChatMember(REQUIRED_GROUP, chatId);
-    const ok = (x) => ["member","administrator","creator"].includes(x.status);
-    return ok(c) && ok(g);
-  } catch {
-    return false;
-  }
+async function isJoined(chatId){
+
+try{
+
+const c=await bot.getChatMember(REQUIRED_CHANNEL,chatId);
+const g=await bot.getChatMember(REQUIRED_GROUP,chatId);
+
+const ok=(x)=>["member","administrator","creator"].includes(x.status);
+
+return ok(c)&&ok(g);
+
+}catch{
+
+return false;
+
 }
 
-// ===== /START =====
-bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
-  const id = msg.chat.id;
-  initUser(id);
-  
-//list all ke liye container
-  db.users[id].username = msg.from.username || null;
+}
+
+// ===== START =====
+bot.onText(/\/start(?:\s+(\d+))?/,async(msg,match)=>{
+
+const id=msg.chat.id;
+
+initUser(id);
+
+db.users[id].username=msg.from.username||null;
 saveDB();
 
-  // referral
-  if (match && match[1]) {
-    const ref = match[1];
-    if (ref !== String(id) && db.users[ref] && !db.users[id].referred) {
-      db.users[ref].credits += REFERRAL_BONUS;
-      db.users[ref].referral_count += 1;
-      db.users[id].referred = true;
-      saveDB();
+// referral
+if(match && match[1]){
 
-      bot.sendMessage(id, "🎁 Referral successful!");
-      bot.sendMessage(ref, `🎉 New referral! +${REFERRAL_BONUS} credits`);
-    }
-  }
+const ref=match[1];
 
-  bot.sendMessage(
-    id,
+if(ref!==String(id) && db.users[ref] && !db.users[id].referred){
+
+db.users[ref].credits+=REFERRAL_BONUS;
+db.users[ref].referral_count+=1;
+
+db.users[id].referred=true;
+
+saveDB();
+
+bot.sendMessage(id,"🎁 Referral successful!");
+bot.sendMessage(ref,`🎉 New referral! +${REFERRAL_BONUS} credits`);
+
+}
+
+}
+
+bot.sendMessage(id,
 `🐎 Ghoda Unhider BOT
 
-Join channel & group first.
-Then press "I have joined".
-Don't be smart buddy ☠☠
+Join channel & group first
+Then press "I have joined"
 
-Credit details.....
-Credits cost per search: ${SEARCH_COST}
+Credits per search: ${SEARCH_COST}
 Daily free credits: ${DAILY_FREE_CREDITS}
 
-Just send the suspect number here`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "📢 Join Channel", url: `https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }],
-          [{ text: "👥 Join Group", url: `https://t.me/${REQUIRED_GROUP.replace("@","")}` }],
-          [{ text: "✅ I have joined", callback_data: "verify_join" }]
-        ]
-      }
-    }
-  );
+Send suspect number`,
+{
+reply_markup:{
+inline_keyboard:[
+[{text:"📢 Join Channel",url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}`}],
+[{text:"👥 Join Group",url:`https://t.me/${REQUIRED_GROUP.replace("@","")}`}],
+[{text:"✅ I have joined",callback_data:"verify_join"}]
+]
+}
 });
 
-// ===== COMMANDS =====
-bot.onText(/\/profile/, (msg) => {
-  const u = getUser(msg.chat.id);
-  bot.sendMessage(
-    msg.chat.id,
+});
+
+// ===== PROFILE =====
+bot.onText(/\/profile/,msg=>{
+
+const u=getUser(msg.chat.id);
+
+bot.sendMessage(msg.chat.id,
 `👤 Profile
 ID: ${msg.chat.id}
 Credits: ${u.credits}
-Referrals: ${u.referral_count}`
-  );
+Referrals: ${u.referral_count}`);
+
 });
 
-bot.onText(/\/credits/, (msg) => {
-  const u = getUser(msg.chat.id);
-  bot.sendMessage(msg.chat.id, `💳 Credits: ${u.credits}`);
+// ===== CREDITS =====
+bot.onText(/\/credits/,msg=>{
+
+const u=getUser(msg.chat.id);
+
+bot.sendMessage(msg.chat.id,`💳 Credits: ${u.credits}`);
+
 });
 
-bot.onText(/\/buy/, (msg) => {
-  bot.sendMessage(
-    msg.chat.id,
+// ===== BUY =====
+bot.onText(/\/buy/,msg=>{
+
+bot.sendMessage(msg.chat.id,
 `💰 Pricing
 ₹10 → 10 credits
 ₹15 → 20 credits
@@ -155,411 +194,241 @@ bot.onText(/\/buy/, (msg) => {
 ₹40 → 70 credits
 ₹50 → 100 credits
 
-extra bonus for loyal users
-DM to buy credits: @${ADMIN_USERNAME}`
-  );
+DM: @${ADMIN_USERNAME}`);
+
 });
 
-bot.onText(/\/refer/, (msg) => {
-  const id = msg.chat.id;
-  bot.sendMessage(
-    id,
-`🎁 Referral link:
+// ===== REFER =====
+bot.onText(/\/refer/,msg=>{
+
+const id=msg.chat.id;
+
+bot.sendMessage(id,
+`🎁 Referral link
 https://t.me/ill_findubot?start=${id}
 
-+${REFERRAL_BONUS} credits per referral`
-  );
-});
-bot.onText(/\/protectme (\d{10})/, (msg, match) => {
-  const id = msg.chat.id;
-  const number = match[1];
-  initUser(id);
++${REFERRAL_BONUS} credits per referral`);
 
-  const u = db.users[id];
-  if (u.credits < 100) {
-    bot.sendMessage(id, "❌ Need 100 credits to protect your number.");
-    return;
-  }
-
-  if (!u.protected_numbers.includes(number)) {
-    u.protected_numbers.push(number);
-    u.credits -= 100;
-    saveDB();
-  }
-
-  bot.sendMessage(id, `🔒 Your number ${number} is now protected.`);
 });
 
-//admin command for add credit
-bot.onText(/\/addcredits (\d+) (\d+)/, (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
+// ===== ADMIN ADD CREDIT =====
+bot.onText(/\/addcredits (\d+) (\d+)/,(msg,match)=>{
 
-  const userId = match[1];
-  const amount = parseInt(match[2], 10);
+if(msg.from.id!==ADMIN_ID) return;
 
-  initUser(userId);
-  db.users[userId].credits += amount;
-  saveDB();
+const userId=match[1];
+const amount=parseInt(match[2]);
 
-  bot.sendMessage(msg.chat.id, `✅ ${amount} credits added to ${userId}`);
-  bot.sendMessage(userId, `💳 Admin added ${amount} credits to your account`);
-});
-//deduct credit admin commandddd
-bot.onText(/\/deductcredits (\d+) (\d+)/, (msg, match) => {
-  // 👑 Only admin
-  if (msg.from.id !== ADMIN_ID) return;
+initUser(userId);
 
-  const userId = match[1];
-  const amount = parseInt(match[2], 10);
+db.users[userId].credits+=amount;
 
-  // user exist ensure
-  initUser(userId);
-  const u = db.users[userId];
+saveDB();
 
-  // deduct logic (no negative)
-  u.credits -= amount;
-  if (u.credits < 0) u.credits = 0;
-  saveDB();
+bot.sendMessage(msg.chat.id,`✅ Added ${amount} credits`);
+bot.sendMessage(userId,`💳 Admin added ${amount} credits`);
 
-  // notify admin
-  bot.sendMessage(
-    msg.chat.id,
-    `✅ Deducted ${amount} credits from ${userId}\n💳 Remaining: ${u.credits}`
-  );
-
-  // notify user (optional but professional)
-  bot.sendMessage(
-    userId,
-    `⚠️ Admin deducted ${amount} credits from your account.\n💳 Remaining credits: ${u.credits}`
-  );
 });
 
+// ===== ADMIN DEDUCT CREDIT =====
+bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
 
-// ban command
-bot.onText(/\/ban (\d+)/, (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
+if(msg.from.id!==ADMIN_ID) return;
 
-  const userId = match[1];
-  initUser(userId);
-  db.users[userId].banned = true;
-  saveDB();
+const userId=match[1];
+const amount=parseInt(match[2]);
 
-  bot.sendMessage(msg.chat.id, `🚫 User ${userId} banned`);
-  bot.sendMessage(userId, "🚫 You have been banned by admin");
-});
-// Uer unbann
-bot.onText(/\/unban (\d+)/, (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
+initUser(userId);
 
-  const userId = match[1];
-  initUser(userId);
-  db.users[userId].banned = false;
-  saveDB();
+db.users[userId].credits-=amount;
 
-  bot.sendMessage(msg.chat.id, `✅ User ${userId} unbanned`);
-  bot.sendMessage(userId, "✅ You have been unbanned");
+if(db.users[userId].credits<0)
+db.users[userId].credits=0;
+
+saveDB();
+
+bot.sendMessage(msg.chat.id,"✅ Credits deducted");
+
 });
 
-// ststsss
-bot.onText(/\/stats/, (msg) => {
-  if (msg.from.id !== ADMIN_ID) return;
+// ===== BAN =====
+bot.onText(/\/ban (\d+)/,(msg,match)=>{
 
-  const totalUsers = Object.keys(db.users).length;
-  const bannedUsers = Object.values(db.users).filter(u => u.banned).length;
+if(msg.from.id!==ADMIN_ID) return;
 
-  bot.sendMessage(
-    msg.chat.id,
-`📊 *Bot Stats*
+const userId=match[1];
 
-👥 Total Users: ${totalUsers}
-🚫 Banned Users: ${bannedUsers}`,
-    { parse_mode: "Markdown" }
-  );
+initUser(userId);
+
+db.users[userId].banned=true;
+
+saveDB();
+
+bot.sendMessage(msg.chat.id,`🚫 User ${userId} banned`);
+
 });
 
-// broadcasttt
-bot.onText(/\/broadcast (.+)/, async (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
+// ===== UNBAN =====
+bot.onText(/\/unban (\d+)/,(msg,match)=>{
 
-  const message = match[1];
-  const users = Object.keys(db.users);
+if(msg.from.id!==ADMIN_ID) return;
 
-  let success = 0;
-  let failed = 0;
+const userId=match[1];
 
-  for (const userId of users) {
-    try {
-      await bot.sendMessage(
-        userId,
-        `📢 *Admin Broadcast*\n\n${message}`,
-        { parse_mode: "Markdown" }
-      );
-      success++;
-    } catch (err) {
-      failed++;
-    }
-  }
+initUser(userId);
 
-  bot.sendMessage(
-    msg.chat.id,
-`✅ *Broadcast Completed*
+db.users[userId].banned=false;
 
-👥 Total Users: ${users.length}
-📨 Sent: ${success}
-❌ Failed: ${failed}`,
-    { parse_mode: "Markdown" }
-  );
-});
-// admin protect numnerr
-bot.onText(/\/protectnumber (\d{10})/, (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
+saveDB();
 
-  const number = match[1];
-  db.protected_numbers = db.protected_numbers || [];
-  if (!db.protected_numbers.includes(number)) {
-    db.protected_numbers.push(number);
-    saveDB();
-  }
+bot.sendMessage(msg.chat.id,`✅ User ${userId} unbanned`);
 
-  bot.sendMessage(msg.chat.id, `🔒 Number ${number} protected (admin).`);
-});
-//unprotect number
-bot.onText(/\/unprotectnumber (\d{10})/, (msg, match) => {
-  if (msg.from.id !== ADMIN_ID) return;
-
-  const number = match[1];
-
-  if (!db.protected_numbers || !db.protected_numbers.includes(number)) {
-    bot.sendMessage(
-      msg.chat.id,
-      `❌ Number ${number} is not in admin protected list.`
-    );
-    return;
-  }
-
-  db.protected_numbers = db.protected_numbers.filter(n => n !== number);
-  saveDB();
-
-  bot.sendMessage(
-    msg.chat.id,
-    `🔓 Number ${number} has been *unprotected successfully*.`,
-    { parse_mode: "Markdown" }
-  );
 });
 
-// admin list all
-bot.onText(/\/listall/, (msg) => {
-  if (msg.from.id !== ADMIN_ID) return;
+// ===== STATS =====
+bot.onText(/\/stats/,msg=>{
 
-  const users = Object.entries(db.users);
-  if (users.length === 0) {
-    bot.sendMessage(msg.chat.id, "No users found.");
-    return;
-  }
+if(msg.from.id!==ADMIN_ID) return;
 
-  let out = "👥 *User List*\n\n";
+const total=Object.keys(db.users).length;
+const banned=Object.values(db.users).filter(u=>u.banned).length;
 
-  users.forEach(([id, u], index) => {
-    out += `#${index + 1}\n`;
-    out += `🆔 ID: ${id}\n`;
-    out += `👤 Name: ${u.name || "NA"}\n`;
-    out += `🔗 Username: ${u.username ? "@" + u.username : "NA"}\n`;
-    out += `💳 Credits: ${u.credits ?? 0}\n\n`;
-  });
+bot.sendMessage(msg.chat.id,
+`📊 Bot Stats
 
-  bot.sendMessage(msg.chat.id, out, { parse_mode: "Markdown" });
+Users: ${total}
+Banned: ${banned}`);
+
 });
 
-///admin protectedlist command
-bot.onText(/\/protectedlist/, (msg) => {
-  if (msg.from.id !== ADMIN_ID) return;
+// ===== BROADCAST =====
+bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
 
-  let out = "🔒 *Protected Numbers List*\n\n";
+if(msg.from.id!==ADMIN_ID) return;
 
-  // Admin global protected numbers
-  const adminProtected = db.protected_numbers || [];
-  if (adminProtected.length > 0) {
-    out += "👑 *Admin Protected:*\n";
-    adminProtected.forEach((num, i) => {
-      out += `${i + 1}. ${num}\n`;
-    });
-    out += "\n";
-  } else {
-    out += "👑 *Admin Protected:* None\n\n";
-  }
+const message=match[1];
+const users=Object.keys(db.users);
 
-  // User protected numbers
-  out += "👤 *User Protected:*\n";
-  let found = false;
+for(const id of users){
 
-  Object.entries(db.users).forEach(([uid, u]) => {
-    if (u.protected_numbers && u.protected_numbers.length > 0) {
-      found = true;
-      out += `\n🆔 User ID: ${uid}\n`;
-      out += `👤 Username: ${u.username || "NA"}\n`;
-      u.protected_numbers.forEach((num, i) => {
-        out += `   ${i + 1}. ${num}\n`;
-      });
-    }
-  });
+try{
+await bot.sendMessage(id,`📢 Admin Broadcast
 
-  if (!found) out += "None";
+${message}`);
+}catch{}
 
-  bot.sendMessage(msg.chat.id, out, { parse_mode: "Markdown" });
+}
+
+bot.sendMessage(msg.chat.id,"✅ Broadcast sent");
+
 });
-
 
 // ===== CALLBACK =====
-bot.on("callback_query", async (q) => {
-  const id = q.message.chat.id;
+bot.on("callback_query",async(q)=>{
 
-  if (q.data === "verify_join") {
-    const ok = await isJoined(id);
-    bot.sendMessage(id, ok ? "✅ Verified! Send number" : "❌ Join first");
-  }
+const id=q.message.chat.id;
 
-  bot.answerCallbackQuery(q.id);
+if(q.data==="verify_join"){
+
+const ok=await isJoined(id);
+
+bot.sendMessage(id, ok ? "✅ Verified" : "❌ Join first");
+
+}
+
+bot.answerCallbackQuery(q.id);
+
 });
 
-// ===== MESSAGE HANDLER (LAST & SAFE) =====
-bot.on("message", async (msg) => {
-  // ignore commands
-  if (msg.entities && msg.entities[0]?.type === "bot_command") return;
+// ===== MESSAGE HANDLER =====
+bot.on("message",async(msg)=>{
 
-  const id = msg.chat.id;
-  const text = msg.text || "";
-  // 🔥 INIT USER FIRST (VERY IMPORTANT)
-  initUser(id);
-  const u = db.users[id];
-  
-  // 🚫 BAN CHECK
-if (db.users[id]?.banned) {
-  bot.sendMessage(id, "🚫 You are banned from using this bot. Contact to Admin MF @ghoda_bawandr");
-  return;
+if(msg.entities && msg.entities[0]?.type==="bot_command") return;
+
+const id=msg.chat.id;
+const text=msg.text||"";
+
+initUser(id);
+
+const u=db.users[id];
+
+// ban check
+if(u.banned){
+bot.sendMessage(id,"🚫 You are banned");
+return;
 }
 
-  if (!/^\d{10}$/.test(text)) return;
+// number check
+if(!/^\d{10}$/.test(text)) return;
 
-  if (!(await isJoined(id))) {
-    bot.sendMessage(id, "Join first");
-    return;
-  }
-
-  if (u.credits < SEARCH_COST) {
-    bot.sendMessage(id, "Not enough credits");
-    return;
-  }
-  // ===== 🔒 PROTECTED NUMBER CHECK =====
-
-// collect all protected numbers
-const adminProtected = db.protected_numbers || [];
-const userProtected = Object.values(db.users)
-  .flatMap(us => us.protected_numbers || []);
-
-const allProtected = [...new Set([...adminProtected, ...userProtected])];
-
-// if number is protected & user is NOT admin
-if (allProtected.includes(text) && msg.from.id !== ADMIN_ID) {
-
-  // allow only owner to search their own protected number
-  if (!u.protected_numbers.includes(text)) {
-    u.credits -= 1;
-    if (u.credits < 0) u.credits = 0;
-    saveDB();
-
-    bot.sendMessage(
-      id,
-`😈 *Number is Protected*
-Only admin can access this number.
-
-💳 Remaining credits: ${u.credits}`,
-      { parse_mode: "Markdown" }
-    );
-    return;
-  }
+if(!(await isJoined(id))){
+bot.sendMessage(id,"Join channel & group first");
+return;
 }
 
-//logic lagaega and search dega
-try {
-  const res = await axios.get(
-    `https://numberinfo-clna.onrender.com/api/lookup?key=${getApiKey()}&mobile=${text}`
-  );
-
-  const results = res.data?.result || [];
-
-  // ❌ RESULT EMPTY → SIRF 1 CREDIT
-  if (!Array.isArray(results) || results.length === 0) {
-    u.credits -= 1;
-    if (u.credits < 0) u.credits = 0;
-    saveDB();
-
-    bot.sendMessage(
-      id,
-`❌ Result not Found
-Search another & we deducted only 1 credit for our community
-
-💳 Remaining credits: ${u.credits}`
-    );
-    return;
-  }
-
-  // ✅ RESULT FOUND → FULL COST
-  u.credits -= SEARCH_COST;
-  if (u.credits < 0) u.credits = 0;
-  saveDB();
-
-  let output = "📊 *Ghoda Unhider Result*\n\n";
-
-  results.forEach((it, index) => {
-    output += `━━━━━━━━━━━━━━━━\n`;
-    output += `🔍 *Record #${index + 1}*\n\n`;
-
-    output += `👤 *Name:* ${it.name || "NA"}\n`;
-    output += `👨‍👦 *Father:* ${it.father_name || "NA"}\n`;
-    output += `📞 *Mobile:* ${it.mobile || "NA"}\n`;
-    output += `🆔 *ID Number:* ${it.id_number || "NA"}\n`;
-    output += `📡 *Circle:* ${it.circle || "NA"}\n`;
-
-    const cleanAddress = (it.address || "NA")
-      .replace(/\s+/g, " ")
-      .replace(/!/g, " ")
-      .trim();
-
-    output += `🏠 *Address:* ${cleanAddress}\n`;
-  });
-
-  output += `━━━━━━━━━━━━━━━━\n`;
-  output += `💳 *Credits Left:* ${u.credits}\n`;
-  output += `⚡ _Powered by Ghoda Unhider_`;
-
-  bot.sendMessage(id, output, { parse_mode: "Markdown" });
-
-} catch (err) {
-  // ❌ API ERROR → SIRF 1 CREDIT
-  u.credits -= 1;
-  if (u.credits < 0) u.credits = 0;
-  saveDB();
-
-  bot.sendMessage(
-    id,
-`❌ Result not Found
-Search another & we deducted only 1 credit for our community
-
-💳 Remaining credits: ${u.credits}`
-  );
+if(u.credits < SEARCH_COST){
+bot.sendMessage(id,"Not enough credits");
+return;
 }
+
+try{
+
+const res=await axios.get(
+`https://ansh-apis.is-dev.org/api/numinfo?key=${API_KEY}&num=${text}`
+);
+
+const results=res.data?.result || [];
+
+if(results.length===0){
+
+u.credits-=1;
+
+saveDB();
+
+bot.sendMessage(id,
+`❌ Result not found
+
+💳 Credits left: ${u.credits}`);
+
+return;
+
+}
+
+u.credits-=SEARCH_COST;
+
+saveDB();
+
+let out="📊 Ghoda Unhider Result\n\n";
+
+results.forEach((r,i)=>{
+
+out+=`Record #${i+1}
+
+Name: ${r.name||"NA"}
+Father: ${r.father_name||"NA"}
+Mobile: ${r.mobile||"NA"}
+Circle: ${r.circle||"NA"}
+Address: ${r.address||"NA"}
+
+`;
+
 });
 
+out+=`💳 Credits left: ${u.credits}`;
 
+bot.sendMessage(id,out);
 
+}catch(e){
 
+u.credits-=1;
 
+saveDB();
 
+bot.sendMessage(id,
+`❌ Result not found
 
+💳 Credits left: ${u.credits}`);
 
+}
 
-
-
-
-
-
+});
