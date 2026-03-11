@@ -2,12 +2,12 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
 
-// ===== BOT TOKEN =====
-const BOT_TOKEN = "8203325157:AAFbx4v_p4Pbp2rOldglQVfzSVjJviq97Lw";
+// ===== ENV VARIABLES =====
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const API_KEY = process.env.API_KEY;
 
 // ===== API =====
 const API_URL = "https://ansh-apis.is-dev.org/api/numinfo";
-const API_KEY = "ansh&num";
 
 const ADMIN_ID = 6668112301;
 const ADMIN_USERNAME = "ghoda_bawandr";
@@ -197,12 +197,31 @@ const userId=match[1];
 const amount=parseInt(match[2]);
 
 initUser(userId);
-
 db.users[userId].credits+=amount;
-
 saveDB();
 
 bot.sendMessage(msg.chat.id,"Credits added");
+
+});
+
+// ===== ADMIN DEDUCT CREDIT =====
+bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const userId=match[1];
+const amount=parseInt(match[2]);
+
+initUser(userId);
+
+db.users[userId].credits-=amount;
+
+if(db.users[userId].credits<0)
+db.users[userId].credits=0;
+
+saveDB();
+
+bot.sendMessage(msg.chat.id,"Credits deducted");
 
 });
 
@@ -214,9 +233,7 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
-
 db.users[userId].banned=true;
-
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User banned");
@@ -231,12 +248,48 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
-
 db.users[userId].banned=false;
-
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User unbanned");
+
+});
+
+// ===== STATS =====
+bot.onText(/\/stats/,msg=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const totalUsers=Object.keys(db.users).length;
+const bannedUsers=Object.values(db.users).filter(u=>u.banned).length;
+
+bot.sendMessage(msg.chat.id,
+`📊 Bot Stats
+
+Users: ${totalUsers}
+Banned: ${bannedUsers}`);
+
+});
+
+// ===== BROADCAST =====
+bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const message=match[1];
+const users=Object.keys(db.users);
+
+for(const id of users){
+
+try{
+await bot.sendMessage(id,`📢 Admin Broadcast
+
+${message}`);
+}catch{}
+
+}
+
+bot.sendMessage(msg.chat.id,"Broadcast completed");
 
 });
 
@@ -281,7 +334,6 @@ u.credits -= 1;
 saveDB();
 
 bot.sendMessage(id,"❌ Result not found");
-
 return;
 
 }
@@ -313,7 +365,6 @@ bot.sendMessage(id,output);
 }catch(err){
 
 console.log(err);
-
 bot.sendMessage(id,"❌ API error");
 
 }
