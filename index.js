@@ -5,16 +5,16 @@ res.writeHead(200,{"Content-Type":"text/plain"});
 res.end("Bot is running");
 }).listen(process.env.PORT || 3000);
 
-// ===== LIBRARIES =====
+// ===== LIBS =====
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
+const https = require("https");
 
 // ===== ENV =====
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const API_KEY = process.env.API_KEY;
 
-// ===== API =====
 const API_URL = "https://ansh-apis.is-dev.org/api/numinfofree";
 
 const ADMIN_ID = 6668112301;
@@ -229,27 +229,6 @@ bot.sendMessage(msg.chat.id,"Credits added");
 
 });
 
-// ===== ADMIN DEDUCT =====
-bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const userId=match[1];
-const amount=parseInt(match[2]);
-
-initUser(userId);
-
-db.users[userId].credits-=amount;
-
-if(db.users[userId].credits<0)
-db.users[userId].credits=0;
-
-saveDB();
-
-bot.sendMessage(msg.chat.id,"Credits deducted");
-
-});
-
 // ===== BAN =====
 bot.onText(/\/ban (\d+)/,(msg,match)=>{
 
@@ -284,44 +263,6 @@ bot.sendMessage(msg.chat.id,"User unbanned");
 
 });
 
-// ===== STATS =====
-bot.onText(/\/stats/,msg=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const totalUsers=Object.keys(db.users).length;
-const bannedUsers=Object.values(db.users).filter(u=>u.banned).length;
-
-bot.sendMessage(msg.chat.id,
-`📊 Bot Stats
-
-Users: ${totalUsers}
-Banned: ${bannedUsers}`);
-
-});
-
-// ===== BROADCAST =====
-bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const message=match[1];
-const users=Object.keys(db.users);
-
-for(const id of users){
-
-try{
-await bot.sendMessage(id,`📢 Admin Broadcast
-
-${message}`);
-}catch{}
-
-}
-
-bot.sendMessage(msg.chat.id,"Broadcast completed");
-
-});
-
 // ===== NUMBER SEARCH =====
 bot.on("message",async(msg)=>{
 
@@ -353,14 +294,18 @@ return;
 
 try{
 
-const res=await axios.get(`${API_URL}?key=${API_KEY}&num=${text}`);
+const agent=new https.Agent({keepAlive:true});
+
+const res=await axios.get(
+`${API_URL}?key=${API_KEY}&num=${text}`,
+{
+timeout:10000,
+httpsAgent:agent
+});
 
 const data=res.data;
 
 if(!data || !data.mobile){
-
-u.credits-=1;
-saveDB();
 
 bot.sendMessage(id,"❌ Result not found");
 return;
@@ -383,8 +328,9 @@ bot.sendMessage(id,output);
 
 }catch(err){
 
-console.log(err);
-bot.sendMessage(id,"❌ API error");
+console.log("API ERROR:",err.message);
+
+bot.sendMessage(id,"⚠️ API connection error, try again");
 
 }
 
