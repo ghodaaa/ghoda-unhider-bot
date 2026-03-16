@@ -1,21 +1,21 @@
 const http = require("http");
 
 http.createServer((req,res)=>{
-  res.writeHead(200, {"Content-Type":"text/plain"});
-  res.end("Bot is running");
+res.writeHead(200,{"Content-Type":"text/plain"});
+res.end("Bot is running");
 }).listen(process.env.PORT || 3000);
 
-//=====
+// ===== LIBRARIES =====
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
 
-// ===== ENV VARIABLES =====
+// ===== ENV =====
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const API_KEY = process.env.API_KEY;
 
 // ===== API =====
-const API_URL = "https://ansh-apis.is-dev.org/api/numinfo";
+const API_URL = "https://ansh-apis.is-dev.org/api/numinfofree";
 
 const ADMIN_ID = 6668112301;
 const ADMIN_USERNAME = "ghoda_bawandr";
@@ -33,6 +33,7 @@ bot.on("polling_error",(err)=>console.log(err));
 
 // ===== DATABASE =====
 const DB_FILE="users.json";
+
 let db={users:{}};
 
 if(fs.existsSync(DB_FILE)){
@@ -42,8 +43,6 @@ db=JSON.parse(fs.readFileSync(DB_FILE));
 function saveDB(){
 fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2));
 }
-
-db.protected_numbers=db.protected_numbers || [];
 
 // ===== USER INIT =====
 function initUser(id){
@@ -55,11 +54,11 @@ credits:DAILY_FREE_CREDITS,
 lastDaily:new Date().toDateString(),
 referred:false,
 referral_count:0,
-banned:false,
-protected_numbers:[]
+banned:false
 };
 
 saveDB();
+
 }
 
 }
@@ -80,15 +79,16 @@ saveDB();
 }
 
 return db.users[id];
+
 }
 
 // ===== JOIN CHECK =====
-async function isJoined(chatId){
+async function isJoined(id){
 
 try{
 
-const c=await bot.getChatMember(REQUIRED_CHANNEL,chatId);
-const g=await bot.getChatMember(REQUIRED_GROUP,chatId);
+const c=await bot.getChatMember(REQUIRED_CHANNEL,id);
+const g=await bot.getChatMember(REQUIRED_GROUP,id);
 
 const ok=(x)=>["member","administrator","creator"].includes(x.status);
 
@@ -101,65 +101,15 @@ return false;
 }
 
 // ===== START =====
-bot.onText(/\/start(?:\s+(\d+))?/, async (msg, match) => {
+bot.onText(/\/start(?:\s+(\d+))?/, async(msg,match)=>{
 
-const id = msg.chat.id;
+const id=msg.chat.id;
 
 initUser(id);
 
-db.users[id].username = msg.from.username || null;
+db.users[id].username=msg.from.username || null;
 saveDB();
 
-// referral
-if(match && match[1]){
-
-const ref = match[1];
-
-if(ref !== String(id) && db.users[ref] && !db.users[id].referred){
-
-db.users[ref].credits += REFERRAL_BONUS;
-db.users[ref].referral_count += 1;
-
-db.users[id].referred = true;
-
-saveDB();
-
-bot.sendMessage(id,"🎁 Referral successful");
-bot.sendMessage(ref,`🎉 New referral +${REFERRAL_BONUS} credits`);
-
-}
-
-}
-
-bot.sendMessage(
-id,
-`🐎 Ghoda Unhider BOT
-
-Join channel & group first.
-Then press "I have joined".
-
-Credits cost per search: ${SEARCH_COST}
-Daily free credits: ${DAILY_FREE_CREDITS}
-
-After verification send the suspect number`,
-{
-reply_markup:{
-inline_keyboard:[
-[
-{ text:"📢 Join Channel", url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }
-],
-[
-{ text:"👥 Join Group", url:`https://t.me/${REQUIRED_GROUP.replace("@","")}` }
-],
-[
-{ text:"✅ I have joined", callback_data:"verify_join" }
-]
-]
-}
-}
-);
-
-});
 // referral
 if(match && match[1]){
 
@@ -189,7 +139,22 @@ Join channel & group first
 Credits per search: ${SEARCH_COST}
 Daily free credits: ${DAILY_FREE_CREDITS}
 
-Send suspect number`);
+Send suspect number`,
+{
+reply_markup:{
+inline_keyboard:[
+[
+{ text:"📢 Join Channel", url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }
+],
+[
+{ text:"👥 Join Group", url:`https://t.me/${REQUIRED_GROUP.replace("@","")}` }
+],
+[
+{ text:"✅ I have joined", callback_data:"verify_join" }
+]
+]
+}
+});
 
 });
 
@@ -255,14 +220,16 @@ const userId=match[1];
 const amount=parseInt(match[2]);
 
 initUser(userId);
+
 db.users[userId].credits+=amount;
+
 saveDB();
 
 bot.sendMessage(msg.chat.id,"Credits added");
 
 });
 
-// ===== ADMIN DEDUCT CREDIT =====
+// ===== ADMIN DEDUCT =====
 bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
@@ -291,7 +258,9 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
+
 db.users[userId].banned=true;
+
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User banned");
@@ -306,7 +275,9 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
+
 db.users[userId].banned=false;
+
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User unbanned");
@@ -351,7 +322,7 @@ bot.sendMessage(msg.chat.id,"Broadcast completed");
 
 });
 
-// ===== MESSAGE HANDLER =====
+// ===== NUMBER SEARCH =====
 bot.on("message",async(msg)=>{
 
 if(msg.entities && msg.entities[0]?.type==="bot_command") return;
@@ -384,11 +355,11 @@ try{
 
 const res=await axios.get(`${API_URL}?key=${API_KEY}&num=${text}`);
 
-const results=res.data?.result || [];
+const data=res.data;
 
-if(results.length===0){
+if(!data || !data.mobile){
 
-u.credits -= 1;
+u.credits-=1;
 saveDB();
 
 bot.sendMessage(id,"❌ Result not found");
@@ -396,27 +367,17 @@ return;
 
 }
 
-u.credits -= SEARCH_COST;
+u.credits-=SEARCH_COST;
 saveDB();
 
-let output="📊 Ghoda Unhider Result\n\n";
+const output=`📊 Ghoda Unhider Result
 
-results.forEach((r,i)=>{
+👤 Name: ${data.name || "NA"}
+👨 Father: ${data.fname || "NA"}
+📞 Mobile: ${data.mobile || text}
+🏠 Address: ${data.address || "NA"}
 
-output+=`Record #${i+1}
-
-👤 Name: ${r.name || "NA"}
-👨 Father: ${r.father_name || "NA"}
-📞 Mobile: ${r.mobile || text}
-📡 Circle: ${r.circle || "NA"}
-🆔 ID: ${r.id_number || "NA"}
-🏠 Address: ${r.address || "NA"}
-
-`;
-
-});
-
-output+=`💳 Credits left: ${u.credits}`;
+💳 Credits left: ${u.credits}`;
 
 bot.sendMessage(id,output);
 
@@ -428,5 +389,3 @@ bot.sendMessage(id,"❌ API error");
 }
 
 });
-
-
