@@ -5,7 +5,7 @@ res.writeHead(200,{"Content-Type":"text/plain"});
 res.end("Bot is running");
 }).listen(process.env.PORT || 3000);
 
-// ===== LIBS =====
+// ===== LIBRARIES =====
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
@@ -229,6 +229,27 @@ bot.sendMessage(msg.chat.id,"Credits added");
 
 });
 
+// ===== ADMIN DEDUCT CREDIT =====
+bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const userId=match[1];
+const amount=parseInt(match[2]);
+
+initUser(userId);
+
+db.users[userId].credits-=amount;
+
+if(db.users[userId].credits<0)
+db.users[userId].credits=0;
+
+saveDB();
+
+bot.sendMessage(msg.chat.id,"Credits deducted");
+
+});
+
 // ===== BAN =====
 bot.onText(/\/ban (\d+)/,(msg,match)=>{
 
@@ -237,9 +258,7 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
-
 db.users[userId].banned=true;
-
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User banned");
@@ -254,12 +273,48 @@ if(msg.from.id!==ADMIN_ID) return;
 const userId=match[1];
 
 initUser(userId);
-
 db.users[userId].banned=false;
-
 saveDB();
 
 bot.sendMessage(msg.chat.id,"User unbanned");
+
+});
+
+// ===== STATS =====
+bot.onText(/\/stats/,msg=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const totalUsers=Object.keys(db.users).length;
+const bannedUsers=Object.values(db.users).filter(u=>u.banned).length;
+
+bot.sendMessage(msg.chat.id,
+`📊 Bot Stats
+
+Users: ${totalUsers}
+Banned: ${bannedUsers}`);
+
+});
+
+// ===== BROADCAST =====
+bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const message=match[1];
+const users=Object.keys(db.users);
+
+for(const id of users){
+
+try{
+await bot.sendMessage(id,`📢 Admin Broadcast
+
+${message}`);
+}catch{}
+
+}
+
+bot.sendMessage(msg.chat.id,"Broadcast completed");
 
 });
 
@@ -305,22 +360,27 @@ httpsAgent:agent
 
 const data=res.data;
 
-if(!data || !data.mobile){
+if(!data.success || !data.result || data.result.length===0){
 
 bot.sendMessage(id,"❌ Result not found");
 return;
 
 }
 
+const r=data.result[0];
+
 u.credits-=SEARCH_COST;
 saveDB();
 
 const output=`📊 Ghoda Unhider Result
 
-👤 Name: ${data.name || "NA"}
-👨 Father: ${data.fname || "NA"}
-📞 Mobile: ${data.mobile || text}
-🏠 Address: ${data.address || "NA"}
+👤 Name: ${r.name || "NA"}
+👨 Father: ${r.father_name || "NA"}
+📞 Mobile: ${r.mobile || text}
+📡 Circle: ${r.circle || "NA"}
+📞 Alt Mobile: ${r.alt_mobile || "NA"}
+🆔 ID: ${r.id_number || "NA"}
+🏠 Address: ${r.address || "NA"}
 
 💳 Credits left: ${u.credits}`;
 
@@ -329,8 +389,7 @@ bot.sendMessage(id,output);
 }catch(err){
 
 console.log("API ERROR:",err.message);
-
-bot.sendMessage(id,"⚠️ API connection error, try again");
+bot.sendMessage(id,"⚠️ API connection error");
 
 }
 
