@@ -5,13 +5,11 @@ res.writeHead(200,{"Content-Type":"text/plain"});
 res.end("Bot is running");
 }).listen(process.env.PORT || 3000);
 
-// ===== LIBRARIES =====
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const fs = require("fs");
 const https = require("https");
 
-// ===== ENV =====
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const API_KEY = process.env.API_KEY;
 
@@ -32,6 +30,7 @@ const bot = new TelegramBot(BOT_TOKEN,{polling:true});
 bot.on("polling_error",(err)=>console.log(err));
 
 // ===== DATABASE =====
+
 const DB_FILE="users.json";
 
 let db={users:{}};
@@ -45,6 +44,7 @@ fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2));
 }
 
 // ===== USER INIT =====
+
 function initUser(id){
 
 if(!db.users[id]){
@@ -83,6 +83,7 @@ return db.users[id];
 }
 
 // ===== JOIN CHECK =====
+
 async function isJoined(id){
 
 try{
@@ -100,7 +101,35 @@ return false;
 
 }
 
+// ===== JOIN BUTTON VERIFY =====
+
+bot.on("callback_query", async (query)=>{
+
+if(query.data==="verify_join"){
+
+const id=query.message.chat.id;
+
+if(await isJoined(id)){
+
+bot.answerCallbackQuery(query.id,{text:"✅ Verified"});
+
+bot.sendMessage(id,"You are verified. Send number now.");
+
+}else{
+
+bot.answerCallbackQuery(query.id,{
+text:"❌ Join channel & group first",
+show_alert:true
+});
+
+}
+
+}
+
+});
+
 // ===== START =====
+
 bot.onText(/\/start(?:\s+(\d+))?/, async(msg,match)=>{
 
 const id=msg.chat.id;
@@ -110,7 +139,6 @@ initUser(id);
 db.users[id].username=msg.from.username || null;
 saveDB();
 
-// referral
 if(match && match[1]){
 
 const ref=match[1];
@@ -159,6 +187,7 @@ inline_keyboard:[
 });
 
 // ===== PROFILE =====
+
 bot.onText(/\/profile/,msg=>{
 
 const u=getUser(msg.chat.id);
@@ -173,6 +202,7 @@ Referrals: ${u.referral_count}`);
 });
 
 // ===== CREDITS =====
+
 bot.onText(/\/credits/,msg=>{
 
 const u=getUser(msg.chat.id);
@@ -182,6 +212,7 @@ bot.sendMessage(msg.chat.id,`💳 Credits: ${u.credits}`);
 });
 
 // ===== BUY =====
+
 bot.onText(/\/buy/,msg=>{
 
 bot.sendMessage(msg.chat.id,
@@ -198,6 +229,7 @@ DM: @${ADMIN_USERNAME}`);
 });
 
 // ===== REFER =====
+
 bot.onText(/\/refer/,msg=>{
 
 const id=msg.chat.id;
@@ -212,6 +244,7 @@ https://t.me/ill_findubot?start=${id}
 });
 
 // ===== ADMIN ADD CREDIT =====
+
 bot.onText(/\/addcredits (\d+) (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
@@ -229,28 +262,8 @@ bot.sendMessage(msg.chat.id,"Credits added");
 
 });
 
-// ===== ADMIN DEDUCT CREDIT =====
-bot.onText(/\/deductcredits (\d+) (\d+)/,(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const userId=match[1];
-const amount=parseInt(match[2]);
-
-initUser(userId);
-
-db.users[userId].credits-=amount;
-
-if(db.users[userId].credits<0)
-db.users[userId].credits=0;
-
-saveDB();
-
-bot.sendMessage(msg.chat.id,"Credits deducted");
-
-});
-
 // ===== BAN =====
+
 bot.onText(/\/ban (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
@@ -266,6 +279,7 @@ bot.sendMessage(msg.chat.id,"User banned");
 });
 
 // ===== UNBAN =====
+
 bot.onText(/\/unban (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
@@ -280,45 +294,8 @@ bot.sendMessage(msg.chat.id,"User unbanned");
 
 });
 
-// ===== STATS =====
-bot.onText(/\/stats/,msg=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const totalUsers=Object.keys(db.users).length;
-const bannedUsers=Object.values(db.users).filter(u=>u.banned).length;
-
-bot.sendMessage(msg.chat.id,
-`📊 Bot Stats
-
-Users: ${totalUsers}
-Banned: ${bannedUsers}`);
-
-});
-
-// ===== BROADCAST =====
-bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
-
-if(msg.from.id!==ADMIN_ID) return;
-
-const message=match[1];
-const users=Object.keys(db.users);
-
-for(const id of users){
-
-try{
-await bot.sendMessage(id,`📢 Admin Broadcast
-
-${message}`);
-}catch{}
-
-}
-
-bot.sendMessage(msg.chat.id,"Broadcast completed");
-
-});
-
 // ===== NUMBER SEARCH =====
+
 bot.on("message",async(msg)=>{
 
 if(msg.entities && msg.entities[0]?.type==="bot_command") return;
@@ -367,22 +344,28 @@ return;
 
 }
 
-const r=data.result[0];
-
 u.credits-=SEARCH_COST;
 saveDB();
 
-const output=`📊 Ghoda Unhider Result
+let output="📊 Ghoda Unhider Result\n\n";
+
+data.result.forEach((r,i)=>{
+
+output+=`Record #${i+1}
 
 👤 Name: ${r.name || "NA"}
 👨 Father: ${r.father_name || "NA"}
-📞 Mobile: ${r.mobile || text}
+📞 Mobile: ${r.mobile || "NA"}
 📡 Circle: ${r.circle || "NA"}
 📞 Alt Mobile: ${r.alt_mobile || "NA"}
 🆔 ID: ${r.id_number || "NA"}
 🏠 Address: ${r.address || "NA"}
 
-💳 Credits left: ${u.credits}`;
+`;
+
+});
+
+output+=`💳 Credits left: ${u.credits}`;
 
 bot.sendMessage(id,output);
 
