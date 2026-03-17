@@ -1,39 +1,35 @@
-const http = require("http");
+const http=require("http");
 
 http.createServer((req,res)=>{
 res.writeHead(200,{"Content-Type":"text/plain"});
-res.end("Bot is running");
-}).listen(process.env.PORT || 3000);
+res.end("Bot alive 🐎");
+}).listen(process.env.PORT||3000);
 
-const TelegramBot = require("node-telegram-bot-api");
-const axios = require("axios");
-const fs = require("fs");
-const https = require("https");
+const TelegramBot=require("node-telegram-bot-api");
+const axios=require("axios");
+const fs=require("fs");
+const https=require("https");
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const API_KEY = process.env.API_KEY;
+const BOT_TOKEN=process.env.BOT_TOKEN;
+const API_KEY=process.env.API_KEY;
 
-const API_URL = "https://ansh-apis.is-dev.org/api/numinfofree";
+const API_URL="https://ansh-apis.is-dev.org/api/numinfofree";
 
-const ADMIN_ID = 6668112301;
-const ADMIN_USERNAME = "ghoda_bawandr";
+const ADMIN_ID=6668112301;
+const ADMIN_USERNAME="ghoda_bawandr";
 
-const REQUIRED_CHANNEL = "@ghoda_spyyc";
-const REQUIRED_GROUP = "@ghoda_spyygc";
+const REQUIRED_CHANNEL="@ghoda_spyyc";
+const REQUIRED_GROUP="@ghoda_spyygc";
 
-const SEARCH_COST = 3;
-const DAILY_FREE_CREDITS = 4;
-const REFERRAL_BONUS = 5;
+const SEARCH_COST=3;
+const LOGIN_BONUS=5;
+const PROTECT_COST=25;
 
-const bot = new TelegramBot(BOT_TOKEN,{polling:true});
-
-bot.on("polling_error",(err)=>console.log(err));
-
-// ===== DATABASE =====
+const bot=new TelegramBot(BOT_TOKEN,{polling:true});
 
 const DB_FILE="users.json";
 
-let db={users:{}};
+let db={users:{},protected_numbers:[]};
 
 if(fs.existsSync(DB_FILE)){
 db=JSON.parse(fs.readFileSync(DB_FILE));
@@ -43,46 +39,33 @@ function saveDB(){
 fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2));
 }
 
-// ===== USER INIT =====
+function initUser(msg){
 
-function initUser(id){
+const id=msg.chat.id;
 
 if(!db.users[id]){
 
 db.users[id]={
-credits:DAILY_FREE_CREDITS,
-lastDaily:new Date().toDateString(),
-referred:false,
+name:msg.from.first_name||"Unknown",
+username:msg.from.username||null,
+credits:LOGIN_BONUS,
 referral_count:0,
+referred:false,
 banned:false
 };
 
 saveDB();
 
-}
+bot.sendMessage(id,
+`🎁 Welcome bonus unlocked
+
+Credits: ${LOGIN_BONUS}
+
+Ab Sherlock ban jao 😏`);
 
 }
 
-function getUser(id){
-
-initUser(id);
-
-const today=new Date().toDateString();
-
-if(db.users[id].lastDaily!==today){
-
-db.users[id].credits+=DAILY_FREE_CREDITS;
-db.users[id].lastDaily=today;
-
-saveDB();
-
 }
-
-return db.users[id];
-
-}
-
-// ===== JOIN CHECK =====
 
 async function isJoined(id){
 
@@ -101,24 +84,21 @@ return false;
 
 }
 
-// ===== JOIN BUTTON VERIFY =====
+bot.on("callback_query",async(q)=>{
 
-bot.on("callback_query", async (query)=>{
+if(q.data==="verify_join"){
 
-if(query.data==="verify_join"){
-
-const id=query.message.chat.id;
+const id=q.message.chat.id;
 
 if(await isJoined(id)){
 
-bot.answerCallbackQuery(query.id,{text:"✅ Verified"});
-
-bot.sendMessage(id,"You are verified. Send number now.");
+bot.answerCallbackQuery(q.id,{text:"Verified"});
+bot.sendMessage(id,"Verification done. Ab number bhej.");
 
 }else{
 
-bot.answerCallbackQuery(query.id,{
-text:"❌ Join channel & group first",
+bot.answerCallbackQuery(q.id,{
+text:"Join channel group pehle",
 show_alert:true
 });
 
@@ -128,200 +108,261 @@ show_alert:true
 
 });
 
-// ===== START =====
+bot.onText(/\/start/,msg=>{
 
-bot.onText(/\/start(?:\s+(\d+))?/, async(msg,match)=>{
+initUser(msg);
 
 const id=msg.chat.id;
-
-initUser(id);
-
-db.users[id].username=msg.from.username || null;
-saveDB();
-
-if(match && match[1]){
-
-const ref=match[1];
-
-if(ref!==String(id) && db.users[ref] && !db.users[id].referred){
-
-db.users[ref].credits+=REFERRAL_BONUS;
-db.users[ref].referral_count+=1;
-
-db.users[id].referred=true;
-
-saveDB();
-
-bot.sendMessage(id,"🎁 Referral successful");
-bot.sendMessage(ref,`🎉 New referral +${REFERRAL_BONUS} credits`);
-
-}
-
-}
 
 bot.sendMessage(id,
 `🐎 Ghoda Unhider BOT
 
-Join channel & group first
+Spy banna hai?
 
-Credits per search: ${SEARCH_COST}
-Daily free credits: ${DAILY_FREE_CREDITS}
-
-Send suspect number`,
+Join channel & group first.`,
 {
 reply_markup:{
 inline_keyboard:[
-[
-{ text:"📢 Join Channel", url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}` }
-],
-[
-{ text:"👥 Join Group", url:`https://t.me/${REQUIRED_GROUP.replace("@","")}` }
-],
-[
-{ text:"✅ I have joined", callback_data:"verify_join" }
-]
+[{text:"📢 Join Channel",url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}`}],
+[{text:"👥 Join Group",url:`https://t.me/${REQUIRED_GROUP.replace("@","")}`}],
+[{text:"✅ I have joined",callback_data:"verify_join"}]
 ]
 }
 });
 
 });
 
-// ===== PROFILE =====
-
 bot.onText(/\/profile/,msg=>{
 
-const u=getUser(msg.chat.id);
+initUser(msg);
+
+const u=db.users[msg.chat.id];
 
 bot.sendMessage(msg.chat.id,
 `👤 Profile
 
+Name: ${u.name}
+Username: @${u.username||"none"}
 ID: ${msg.chat.id}
-Credits: ${u.credits}
-Referrals: ${u.referral_count}`);
+
+Credits: ${u.credits}`);
 
 });
-
-// ===== CREDITS =====
 
 bot.onText(/\/credits/,msg=>{
 
-const u=getUser(msg.chat.id);
+initUser(msg);
 
-bot.sendMessage(msg.chat.id,`💳 Credits: ${u.credits}`);
+bot.sendMessage(msg.chat.id,
+`💳 Credits: ${db.users[msg.chat.id].credits}`);
 
 });
-
-// ===== BUY =====
 
 bot.onText(/\/buy/,msg=>{
 
 bot.sendMessage(msg.chat.id,
-`💰 Pricing
+`💰 Credit Shop
 
 ₹10 → 10 credits
 ₹15 → 20 credits
 ₹30 → 50 credits
-₹40 → 70 credits
 ₹50 → 100 credits
 
-DM: @${ADMIN_USERNAME}`);
+DM @${ADMIN_USERNAME}`);
 
 });
 
-// ===== REFER =====
-
-bot.onText(/\/refer/,msg=>{
+bot.onText(/\/protectnumber (\d+)/,(msg,match)=>{
 
 const id=msg.chat.id;
+const number=match[1];
+
+initUser(msg);
+
+const u=db.users[id];
+
+if(u.credits<PROTECT_COST){
+
+bot.sendMessage(id,"25 credits chahiye protect karne ke liye.");
+return;
+
+}
+
+if(db.protected_numbers.includes(number)){
+
+bot.sendMessage(id,"Number already protected.");
+return;
+
+}
+
+u.credits-=PROTECT_COST;
+
+db.protected_numbers.push(number);
+
+saveDB();
 
 bot.sendMessage(id,
-`🎁 Referral link
+`🔒 Number protected
 
-https://t.me/ill_findubot?start=${id}
+${number}
 
-+${REFERRAL_BONUS} credits per referral`);
+Ab koi user iska data nahi dekhega 😏`);
 
 });
 
-// ===== ADMIN ADD CREDIT =====
-
-bot.onText(/\/addcredits (\d+) (\d+)/,(msg,match)=>{
+bot.onText(/\/addcredit (\d+) (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
 
-const userId=match[1];
+const uid=match[1];
 const amount=parseInt(match[2]);
 
-initUser(userId);
+if(db.users[uid]){
 
-db.users[userId].credits+=amount;
+db.users[uid].credits+=amount;
 
 saveDB();
 
 bot.sendMessage(msg.chat.id,"Credits added");
 
+}
+
 });
 
-// ===== BAN =====
-
-bot.onText(/\/ban (\d+)/,(msg,match)=>{
+bot.onText(/\/deductcredit (\d+) (\d+)/,(msg,match)=>{
 
 if(msg.from.id!==ADMIN_ID) return;
 
-const userId=match[1];
+const uid=match[1];
+const amount=parseInt(match[2]);
 
-initUser(userId);
-db.users[userId].banned=true;
+if(db.users[uid]){
+
+db.users[uid].credits-=amount;
+
+if(db.users[uid].credits<0) db.users[uid].credits=0;
+
 saveDB();
 
-bot.sendMessage(msg.chat.id,"User banned");
+bot.sendMessage(msg.chat.id,"Credits deducted");
+
+}
 
 });
 
-// ===== UNBAN =====
-
-bot.onText(/\/unban (\d+)/,(msg,match)=>{
+bot.onText(/\/plist/,msg=>{
 
 if(msg.from.id!==ADMIN_ID) return;
 
-const userId=match[1];
+let text="Protected numbers\n\n";
 
-initUser(userId);
-db.users[userId].banned=false;
-saveDB();
+db.protected_numbers.forEach(n=>{
 
-bot.sendMessage(msg.chat.id,"User unbanned");
+text+=n+"\n";
+
+if(text.length>3500){
+
+bot.sendMessage(msg.chat.id,text);
+text="";
+
+}
 
 });
 
-// ===== NUMBER SEARCH =====
+if(text) bot.sendMessage(msg.chat.id,text);
+
+});
+
+bot.onText(/\/broadcast (.+)/,async(msg,match)=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const text=match[1];
+
+for(const id of Object.keys(db.users)){
+
+try{
+await bot.sendMessage(id,`📢 Announcement\n\n${text}`);
+}catch{}
+
+}
+
+bot.sendMessage(msg.chat.id,"Broadcast done");
+
+});
+
+bot.onText(/\/stats/,msg=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+const total=Object.keys(db.users).length;
+
+bot.sendMessage(msg.chat.id,
+`📊 Bot Stats
+
+Users: ${total}
+Protected numbers: ${db.protected_numbers.length}`);
+
+});
+
+bot.onText(/\/listall/,msg=>{
+
+if(msg.from.id!==ADMIN_ID) return;
+
+let text="Users list\n\n";
+
+for(const id of Object.keys(db.users)){
+
+const u=db.users[id];
+
+text+=`Name: ${u.name}
+Username: @${u.username||"none"}
+ID: ${id}
+Credits: ${u.credits}
+
+`;
+
+if(text.length>3500){
+
+bot.sendMessage(msg.chat.id,text);
+text="";
+
+}
+
+}
+
+if(text) bot.sendMessage(msg.chat.id,text);
+
+});
 
 bot.on("message",async(msg)=>{
 
 if(msg.entities && msg.entities[0]?.type==="bot_command") return;
 
-const id=msg.chat.id;
-const text=msg.text || "";
+initUser(msg);
 
-initUser(id);
+const id=msg.chat.id;
+const text=msg.text||"";
 
 const u=db.users[id];
-
-if(u.banned){
-bot.sendMessage(id,"🚫 You are banned");
-return;
-}
 
 if(!/^\d{10}$/.test(text)) return;
 
 if(!(await isJoined(id))){
-bot.sendMessage(id,"Join channel & group first");
+bot.sendMessage(id,"Join channel group pehle.");
 return;
 }
 
-if(u.credits < SEARCH_COST){
-bot.sendMessage(id,"Not enough credits");
+if(db.protected_numbers.includes(text) && msg.from.id!==ADMIN_ID){
+bot.sendMessage(id,"🚫 Ye number protected hai.");
 return;
+}
+
+if(u.credits<SEARCH_COST && msg.from.id!==ADMIN_ID){
+
+bot.sendMessage(id,"Credits khatam.");
+return;
+
 }
 
 try{
@@ -330,49 +371,50 @@ const agent=new https.Agent({keepAlive:true});
 
 const res=await axios.get(
 `${API_URL}?key=${API_KEY}&num=${text}`,
-{
-timeout:10000,
-httpsAgent:agent
-});
+{timeout:10000,httpsAgent:agent}
+);
 
 const data=res.data;
 
-if(!data.success || !data.result || data.result.length===0){
+if(!data.success||!data.result||data.result.length===0){
 
-bot.sendMessage(id,"❌ Result not found");
+bot.sendMessage(id,"Data nahi mila.");
 return;
 
 }
 
+if(msg.from.id!==ADMIN_ID){
 u.credits-=SEARCH_COST;
 saveDB();
+}
 
-let output="📊 Ghoda Unhider Result\n\n";
+let output="📊 Investigation Result\n\n";
 
 data.result.forEach((r,i)=>{
 
-output+=`Record #${i+1}
+output+=`Record ${i+1}
 
-👤 Name: ${r.name || "NA"}
-👨 Father: ${r.father_name || "NA"}
-📞 Mobile: ${r.mobile || "NA"}
-📡 Circle: ${r.circle || "NA"}
-📞 Alt Mobile: ${r.alt_mobile || "NA"}
-🆔 ID: ${r.id_number || "NA"}
-🏠 Address: ${r.address || "NA"}
+Name: ${r.name||"NA"}
+Father: ${r.father_name||"NA"}
+Mobile: ${r.mobile||"NA"}
+Circle: ${r.circle||"NA"}
+Alt: ${r.alt_mobile||"NA"}
+ID: ${r.id_number||"NA"}
+Address: ${r.address||"NA"}
 
 `;
 
 });
 
+if(msg.from.id!==ADMIN_ID){
 output+=`💳 Credits left: ${u.credits}`;
+}
 
 bot.sendMessage(id,output);
 
-}catch(err){
+}catch{
 
-console.log("API ERROR:",err.message);
-bot.sendMessage(id,"⚠️ API connection error");
+bot.sendMessage(id,"API error");
 
 }
 
