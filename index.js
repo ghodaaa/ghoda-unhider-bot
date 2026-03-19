@@ -55,9 +55,10 @@ const REQUIRED_GROUP = "@ghoda_spyygc";
 // BOT SETTINGS
 // ================================
 
-const SEARCH_COST = 3;
+const SEARCH_COST = 4;
 const LOGIN_BONUS = 5;
-const PROTECT_COST = 25;
+const PROTECT_COST = 30;
+const REFERRAL_BONUS = 3;
 
 
 // ================================
@@ -76,7 +77,11 @@ const DB_FILE = "users.json";
 let db = { users:{}, protected_numbers:[] };
 
 if(fs.existsSync(DB_FILE)){
+try{
 db = JSON.parse(fs.readFileSync(DB_FILE));
+}catch{
+db = { users:{}, protected_numbers:[] };
+}
 }
 
 function saveDB(){
@@ -98,8 +103,8 @@ db.users[id] = {
 name: msg.from.first_name || "Unknown",
 username: msg.from.username || null,
 credits: LOGIN_BONUS,
-referral_count:0,
-referred:false,
+referral_count: 0,
+referred_by: null,
 banned:false
 };
 
@@ -140,7 +145,85 @@ return false;
 
 
 // ================================
-// JOIN BUTTON VERIFY
+// REFERRAL COMMAND
+// ================================
+
+bot.onText(/\/ref/,msg=>{
+
+const id = msg.chat.id;
+
+const link = `https://t.me/${bot.options.username || "ill_findubot"}?start=ref_${id}`;
+
+bot.sendMessage(id,
+`🔗 Your referral link:
+
+${link}
+
+Har successful refer pe ${REFERRAL_BONUS} credits milenge 😏`);
+
+});
+
+
+// ================================
+// START COMMAND (WITH REFERRAL)
+// ================================
+
+bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
+
+initUser(msg);
+
+const id = msg.chat.id;
+const ref = match[1];
+
+// REFERRAL LOGIC
+if(ref && ref.startsWith("ref_")){
+
+const referrerId = ref.split("_")[1];
+
+if(
+referrerId != id &&
+db.users[referrerId] &&
+!db.users[id].referred_by
+){
+
+db.users[referrerId].credits += REFERRAL_BONUS;
+db.users[referrerId].referral_count += 1;
+
+db.users[id].referred_by = referrerId;
+
+saveDB();
+
+bot.sendMessage(referrerId,
+`🎉 New referral joined!
+
+User: ${msg.from.first_name}
++${REFERRAL_BONUS} credits added 😏`);
+
+}
+
+}
+
+bot.sendMessage(id,
+`🐎 Ghoda Unhider BOT
+
+Spy banna hai tujhe?
+
+Join channel & group first.`,
+{
+reply_markup:{
+inline_keyboard:[
+[{text:"📢 Join Channel",url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}`}],
+[{text:"👥 Join Group",url:`https://t.me/${REQUIRED_GROUP.replace("@","")}`}],
+[{text:"✅ I have joined",callback_data:"verify_join"}]
+]
+}
+});
+
+});
+
+
+// ================================
+// JOIN VERIFY
 // ================================
 
 bot.on("callback_query",async(q)=>{
@@ -157,42 +240,13 @@ bot.sendMessage(id,"Verification done. Ab number bhej.");
 }else{
 
 bot.answerCallbackQuery(q.id,{
-text:"Join channel group pehle",
+text:"Join kar pehle channel & group",
 show_alert:true
 });
 
 }
 
 }
-
-});
-
-
-// ================================
-// START COMMAND
-// ================================
-
-bot.onText(/\/start/,msg=>{
-
-initUser(msg);
-
-const id = msg.chat.id;
-
-bot.sendMessage(id,
-`🐎 Ghoda Unhider BOT
-
-Spy banna hai?
-
-Join channel & group first.`,
-{
-reply_markup:{
-inline_keyboard:[
-[{text:"📢 Join Channel",url:`https://t.me/${REQUIRED_CHANNEL.replace("@","")}`}],
-[{text:"👥 Join Group",url:`https://t.me/${REQUIRED_GROUP.replace("@","")}`}],
-[{text:"✅ I have joined",callback_data:"verify_join"}]
-]
-}
-});
 
 });
 
@@ -214,21 +268,8 @@ Name: ${u.name}
 Username: @${u.username || "none"}
 ID: ${msg.chat.id}
 
-Credits: ${u.credits}`);
-
-});
-
-
-// ================================
-// CREDITS
-// ================================
-
-bot.onText(/\/credits/,msg=>{
-
-initUser(msg);
-
-bot.sendMessage(msg.chat.id,
-`💳 Credits: ${db.users[msg.chat.id].credits}`);
+Credits: ${u.credits}
+Referrals: ${u.referral_count}`);
 
 });
 
@@ -243,15 +284,15 @@ bot.sendMessage(msg.chat.id,
 `💰 Credit Shop
 
 ₹10 → 10 credits
-₹15 → 20 credits
-₹30 → 50 credits
-₹50 → 100 credits
+₹20 → 25 credits
+₹35 → 50 credits
+₹50 → 80 credits
+₹100 → 200 credits
+₹200 → 500 credits
 
 DM @${ADMIN_USERNAME}`);
 
 });
-
-
 // ================================
 // HELP COMMAND
 // ================================
@@ -274,10 +315,15 @@ User Commands
 
 /start
 /profile
-/credits
 /buy
+/ref
 /protectnumber
 /help
+
+━━━━━━━━━━━━━━━
+Referral System
+
+Har refer pe ${REFERRAL_BONUS} credits milte hai 😏
 
 ━━━━━━━━━━━━━━━
 Protect Number
@@ -294,8 +340,10 @@ Bot Developer
 bot.sendMessage(msg.chat.id,helpText);
 
 });
+
+
 // ================================
-// USER PROTECT NUMBER
+// PROTECT NUMBER
 // ================================
 
 bot.onText(/\/protectnumber (\d+)/,(msg,match)=>{
@@ -308,7 +356,7 @@ initUser(msg);
 const u = db.users[id];
 
 if(u.credits < PROTECT_COST){
-bot.sendMessage(id,"25 credits chahiye protect karne ke liye.");
+bot.sendMessage(id,"30 credits chahiye protect karne ke liye.");
 return;
 }
 
@@ -324,7 +372,7 @@ db.protected_numbers.push(number);
 saveDB();
 
 bot.sendMessage(id,
-`🔒 Number protected
+`🔒 Number is protected
 
 ${number}
 
@@ -412,7 +460,7 @@ if(text) bot.sendMessage(msg.chat.id,text);
 
 
 // ================================
-// ADMIN UNPROTECT NUMBER
+// ADMIN UNPROTECT
 // ================================
 
 bot.onText(/\/unprotect (\d+)/,(msg,match)=>{
@@ -506,6 +554,7 @@ text += `Name: ${u.name}
 Username: @${u.username || "none"}
 ID: ${id}
 Credits: ${u.credits}
+Referrals: ${u.referral_count}
 
 `;
 
@@ -524,7 +573,38 @@ if(text) bot.sendMessage(msg.chat.id,text);
 
 
 // ================================
-// NUMBER SEARCH HANDLER
+// ADMIN TOP REFERRERS
+// ================================
+
+bot.onText(/\/topref/,msg=>{
+
+if(msg.from.id !== ADMIN_ID) return;
+
+let users = Object.entries(db.users);
+
+users.sort((a,b)=> b[1].referral_count - a[1].referral_count);
+
+let top = users.slice(0,5);
+
+let text = "🏆 Top 5 Referrers\n\n";
+
+top.forEach(([id,u],i)=>{
+
+text += `${i+1}. ${u.name}
+ID: ${id}
+Referrals: ${u.referral_count}
+
+`;
+
+});
+
+bot.sendMessage(msg.chat.id,text);
+
+});
+
+
+// ================================
+// NUMBER SEARCH
 // ================================
 
 bot.on("message",async(msg)=>{
@@ -538,7 +618,7 @@ const text = msg.text || "";
 
 const u = db.users[id];
 
-// only 10 digit numbers
+// only 10 digit
 if(!/^\d{10}$/.test(text)) return;
 
 // join check
@@ -547,7 +627,7 @@ bot.sendMessage(id,"Join channel group pehle.");
 return;
 }
 
-// protected check (admin bypass)
+// protected check
 if(db.protected_numbers.includes(text) && msg.from.id !== ADMIN_ID){
 bot.sendMessage(id,"🚫 Ye number protected hai.");
 return;
@@ -575,7 +655,7 @@ bot.sendMessage(id,"Data nahi mila.");
 return;
 }
 
-// deduct credits for users
+// deduct credits
 if(msg.from.id !== ADMIN_ID){
 u.credits -= SEARCH_COST;
 saveDB();
