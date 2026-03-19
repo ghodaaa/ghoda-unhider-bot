@@ -206,9 +206,9 @@ User: ${msg.from.first_name}
 bot.sendMessage(id,
 `🐎 Ghoda Unhider BOT
 
-Spy banna hai tujhe?
+Spy ban na hai tujhe? hmmmm 🌚🌚
 
-Join channel & group first.`,
+Chal to Join kar channel & group aur dekh jadooo.`,
 {
 reply_markup:{
 inline_keyboard:[
@@ -235,12 +235,12 @@ const id = q.message.chat.id;
 if(await isJoined(id)){
 
 bot.answerCallbackQuery(q.id,{text:"Verified"});
-bot.sendMessage(id,"Verification done. Ab number bhej.");
+bot.sendMessage(id,"Verification done. Ab suspect ka number bhej bina +91 ke aur leja detailss uski ☠☠. Agar username se uska number chahiye to /help dba");
 
 }else{
 
 bot.answerCallbackQuery(q.id,{
-text:"Join kar pehle channel & group",
+text:"Laude chutiya samjha hai kya ?? Join kar pehle channel & group",
 show_alert:true
 });
 
@@ -321,6 +321,12 @@ User Commands
 /help
 
 ━━━━━━━━━━━━━━━
+Username to Number:
+
+Agar Username ya id se uska number chahiye to dm karo ye private service h ☠
+@ghoda_bawandr
+
+━━━━━━━━━━━━━━━
 Referral System
 
 Har refer pe ${REFERRAL_BONUS} credits milte hai 😏
@@ -385,7 +391,7 @@ Ab koi user iska data nahi dekhega 😏`);
 // ADMIN ADD CREDIT
 // ================================
 
-bot.onText(/\/addcredit (\d+) (\d+)/,(msg,match)=>{
+bot.onText(/\/addcredit (\d+) (\d+)/, async (msg,match)=>{
 
 if(msg.from.id !== ADMIN_ID) return;
 
@@ -398,18 +404,34 @@ db.users[uid].credits += amount;
 
 saveDB();
 
-bot.sendMessage(msg.chat.id,"Credits added");
+// ADMIN CONFIRMATION
+bot.sendMessage(msg.chat.id,`✅ ${amount} credits added to ${uid}`);
+
+// USER NOTIFICATION
+try{
+await bot.sendMessage(uid,
+`💰 Credits Added!
+
++${amount} credits added to your account 😏
+
+Current Balance: ${db.users[uid].credits}`);
+}catch(err){
+console.log("User message failed:",err.message);
+}
+
+}else{
+
+bot.sendMessage(msg.chat.id,"❌ User not found");
 
 }
 
 });
 
-
 // ================================
 // ADMIN DEDUCT CREDIT
 // ================================
 
-bot.onText(/\/deductcredit (\d+) (\d+)/,(msg,match)=>{
+bot.onText(/\/deductcredit (\d+) (\d+)/, async (msg,match)=>{
 
 if(msg.from.id !== ADMIN_ID) return;
 
@@ -426,12 +448,28 @@ db.users[uid].credits = 0;
 
 saveDB();
 
-bot.sendMessage(msg.chat.id,"Credits deducted");
+// ADMIN CONFIRMATION
+bot.sendMessage(msg.chat.id,`⚠️ ${amount} credits deducted from ${uid}`);
+
+// USER NOTIFICATION
+try{
+await bot.sendMessage(uid,
+`⚠️ Credits Deducted
+
+-${amount} credits deducted from your account
+
+Current Balance: ${db.users[uid].credits}`);
+}catch(err){
+console.log("User message failed:",err.message);
+}
+
+}else{
+
+bot.sendMessage(msg.chat.id,"❌ User not found");
 
 }
 
 });
-
 
 // ================================
 // ADMIN PROTECTED LIST
